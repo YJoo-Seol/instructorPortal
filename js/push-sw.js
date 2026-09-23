@@ -1,92 +1,146 @@
-/* ==========================================================
-   창의배움터 Web Push Service Worker
-   파일 위치:
-   /js/push-sw.js
-   ========================================================== */
+// ============================================================
+// B&K 창의배움터 Web Push Service Worker
+// ============================================================
 
 "use strict";
 
-// ==========================================================
-// 푸시 수신
-// ==========================================================
+// ============================================================
+// Push 수신
+// ============================================================
 
 self.addEventListener("push", function (event) {
-	let data = {};
+	console.log("[Push SW] push 이벤트 수신");
+
+	let data = {
+		title: "창의배움터",
+		body: "새로운 알림이 있습니다.",
+		url: "../admin.html",
+	};
 
 	try {
 		if (event.data) {
-			data = event.data.json();
+			const json = event.data.json();
+
+			data = {
+				...data,
+				...json,
+			};
 		}
 	} catch (error) {
-		console.warn("[WebPush SW] JSON 파싱 실패:", error);
+		console.error("[Push SW] Push 데이터 파싱 실패:", error);
 
-		data = {
-			title: "창의배움터",
-			body: event.data ? event.data.text() : "새로운 알림이 있습니다.",
-		};
+		try {
+			if (event.data) {
+				data.body = event.data.text();
+			}
+		} catch (textError) {
+			console.error("[Push SW] Push text 파싱 실패:", textError);
+		}
 	}
 
-	const title = data.title || "창의배움터";
+	// ----------------------------------------------------------
+	// 아이콘
+	//
+	// push-sw.js 위치:
+	// /instructorCheck/js/push-sw.js
+	//
+	// icon:
+	// /instructorCheck/icon-192.png
+	// ----------------------------------------------------------
 
-	const body = data.body || "새로운 알림이 있습니다.";
+	const iconUrl = new URL(
+		"../icon-192.png",
+		self.registration.scope,
+	).toString();
+
+	const adminUrl = new URL("../admin.html", self.registration.scope).toString();
+
+	const targetUrl = data.url || adminUrl;
 
 	const options = {
-		body: body,
+		body: data.body || "새로운 알림이 있습니다.",
 
-		icon: data.icon || "../icon-192.png",
+		icon: data.icon || iconUrl,
 
-		badge: data.badge || "../icon-192.png",
+		badge: data.badge || iconUrl,
 
-		tag: data.tag || "bnkedu-report",
+		tag: data.tag || "bnkedu-push",
+
+		renotify: true,
 
 		data: {
-			url: data.url || "../admin.html",
+			url: targetUrl,
 		},
 	};
 
-	event.waitUntil(self.registration.showNotification(title, options));
+	event.waitUntil(
+		self.registration.showNotification(data.title || "창의배움터", options),
+	);
 });
 
-// ==========================================================
+// ============================================================
 // 알림 클릭
-// ==========================================================
+// ============================================================
 
 self.addEventListener("notificationclick", function (event) {
+	console.log("[Push SW] 알림 클릭");
+
 	event.notification.close();
 
-	const notificationData = event.notification.data || {};
-
-	const targetUrl = notificationData.url || "../admin.html";
+	const targetUrl =
+		event.notification?.data?.url ||
+		new URL("../admin.html", self.registration.scope).toString();
 
 	event.waitUntil(
-		self.clients
-			.matchAll({
+		(async () => {
+			const windowClients = await clients.matchAll({
 				type: "window",
 				includeUncontrolled: true,
-			})
+			});
 
-			.then(function (clientList) {
-				// ----------------------------------------------------
-				// 이미 열려 있는 포털이 있으면 해당 화면으로 이동
-				// ----------------------------------------------------
+			// ------------------------------------------------------
+			// 이미 포털 창이 열려 있으면 그 창으로 이동
+			// ------------------------------------------------------
 
-				for (const client of clientList) {
-					if (client.url && "focus" in client) {
-						return client.navigate(targetUrl).then(function () {
-							return client.focus();
-						});
-					}
+			for (const client of windowClients) {
+				try {
+					await client.navigate(targetUrl);
+
+					await client.focus();
+
+					return;
+				} catch (error) {
+					console.warn("[Push SW] 기존 창 이동 실패:", error);
 				}
+			}
 
-				// ----------------------------------------------------
-				// 열려 있는 창이 없으면 새 창
-				// ----------------------------------------------------
+			// ------------------------------------------------------
+			// 열려 있는 창이 없으면 새 창
+			// ------------------------------------------------------
 
-				if (self.clients.openWindow) {
-					return self.clients.openWindow(targetUrl);
-				}
-
-				return undefined;
-			}),
+			if (clients.openWindow) {
+				await clients.openWindow(targetUrl);
+			}
+		})(),
 	);
+});
+
+// ============================================================
+// Install
+// ============================================================
+
+self.addEventListener("install", function () {
+	console.log("[Push SW] install");
+
+	self.skipWaiting();
+});
+
+// ============================================================
+// Activate
+// ============================================================
+
+self.addEventListener("activate", function (event) {
+	console.log("[Push SW] activate");
+
+	event.waitUntil(self.clients.claim());
 });
