@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>출강 일정 | 창의배움터 강사 포털</title>
+
+    <link rel="stylesheet" href="css/common.css" />
+    <link rel="stylesheet" href="css/schedule.css" />
+  </head>
+
+  <body>
+    <main class="page">
+      <div class="container schedule-container">
+        <!-- 상단 -->
+        <div class="portal-header">
+          <h1 class="portal-title">창의배움터 강사 포털</h1>
+
+          <!-- 로그인된 강사 정보 및 강사번호 통합 표시 -->
+          <div class="logged-in-user">
+            <span id="displayName" class="info-value"><b>-</b> 님</span>
+            <span class="instructor-sub-info"
+              >강사번호: <span id="instructorNo">-</span></span
+            >
+          </div>
+
+          <!-- 공통 탭 네비게이션 -->
+          <div class="page-nav">
+            <a href="schedule.html" class="page-nav-item active">출강 일정</a>
+            <a href="confirmation.html" class="page-nav-item">강사확인서</a>
+            <!-- <a href="admin.html" class="page-nav-item">대시보드</a> -->
+          </div>
+        </div>
+        <div id="dateNavRange" class="date-nav-range"></div>
+        <!-- 날짜 이동 네비게이션 바 -->
+        <!-- 날짜 네비게이션 바 (텍스트는 JS가 자동으로 채워줍니다) -->
+        <div class="date-nav-container">
+          <span class="date-nav-arrow" onclick="moveDate(-1)">◀</span>
+          <span
+            id="dateNavDisplay"
+            class="date-nav-text"
+            onclick="resetToToday()"
+            title="오늘 날짜로 이동"
+          ></span>
+          <span class="date-nav-arrow" onclick="moveDate(1)">▶</span>
+        </div>
+
+        <!-- 오늘 출강 일정 -->
+        <section class="day-schedule-section">
+          <!-- <h3 class="day-schedule-title">출강 일정</h3> -->
+
+          <!-- 오늘 일정 없음 -->
+          <div
+            id="scheduleEmptyMessage"
+            class="empty-message"
+            style="display: none"
+          >
+            오늘 출강 일정 없음
+          </div>
+          <!-- 로딩 -->
+          <div id="loadingMessage" class="loading-message">
+            출강 일정을 불러오는 중입니다...
+          </div>
+
+          <!-- 오류 -->
+          <div
+            id="errorMessage"
+            class="error-message"
+            style="display: none"
+          ></div>
+
+          <!-- PC 테이블 -->
+          <div
+            id="scheduleTableWrap"
+            class="schedule-table-wrap"
+            style="display: none"
+          >
+            <table class="schedule-table">
+              <thead>
+                <tr>
+                  <th>시설명</th>
+                  <th>주소</th>
+                  <th>시간</th>
+                  <th>차시</th>
+                  <th>대상</th>
+                  <th>보고</th>
+                </tr>
+              </thead>
+
+              <tbody id="scheduleTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- 모바일 카드 -->
+          <div
+            id="scheduleCardWrap"
+            class="schedule-card-wrap"
+            style="display: none"
+          ></div>
+        </section>
+        <!-- 내 확정 일정 전체 보기 -->
+        <div class="confirmed-schedule-wrap">
+          <a
+            id="confirmedScheduleLink"
+            class="confirmed-schedule-link"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            🔗전체 확정 일정 바로가기
+          </a>
+        </div>
+      </div>
+
+      <script src="js/schedule.js"></script>
+    </main>
+  </body>
+</html>

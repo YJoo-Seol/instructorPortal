@@ -1,0 +1,474 @@
+/* ============================================================
+   기본(PC 기준) 스타일
+   ============================================================ */
+.schedule-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 40px auto;
+  background: #fff;
+  padding: 32px 28px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(31, 41, 55, 0.08);
+  box-sizing: border-box;
+}
+
+.portal-header {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.portal-header-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding-bottom: 18px;
+}
+
+.portal-title {
+  font-weight: 700;
+  color: #406093;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.instructor-number {
+  margin: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7a8491;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   확인서 본문
+   ============================================================ */
+
+.sheet-box {
+  border: 2px solid #374151;
+  margin-top: 24px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 12px;
+  padding-bottom: 30px !important;
+  margin-bottom: 20px !important;
+}
+
+.sheet-header {
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  margin: 20px 0 16px 0;
+  border-bottom: 2px solid #374151;
+  padding-bottom: 10px;
+  color: #26364d;
+}
+
+.summary-card-container {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 10px !important;
+  margin-bottom: 14px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.summary-card {
+  flex: 1 !important;
+  width: 50% !important;
+  background-color: #f8fbff;
+  border: 1px solid #d5e2f3;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.summary-card.total-card {
+  background-color: #eef3fa;
+  border: 1px solid #c7d7eb;
+}
+
+.summary-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #406093;
+  margin-bottom: 4px;
+}
+
+.summary-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #334f7b;
+  text-align: right;
+  word-break: break-all;
+}
+
+/* ============================================================
+   테이블 속성 최적화
+   PC/모바일 글자 밀림 및 밖으로 튀어나감 방지
+   ============================================================ */
+
+table.data-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  margin-top: 8px;
+  margin-bottom: 25px !important;
+  table-layout: fixed !important;
+}
+
+#confirmation-card tr {
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+}
+
+.data-table {
+  page-break-inside: auto !important;
+  break-inside: auto !important;
+}
+
+.signature-area,
+.pdf-avoid-break {
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+}
+
+#confirmation-card table.data-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  margin-top: 8px !important;
+  margin-bottom: 25px !important;
+  table-layout: fixed !important;
+}
+
+#confirmation-card table.data-table tr {
+  display: table-row !important;
+  vertical-align: middle !important;
+}
+
+#confirmation-card table.data-table th,
+#confirmation-card table.data-table td {
+  display: table-cell !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 8px 4px !important;
+  border: 1px dotted #d5dbe3 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-size: 12.5px !important;
+  line-height: 1.35 !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  box-sizing: border-box !important;
+}
+
+#confirmation-card table.data-table th {
+  background-color: #f5f7fa !important;
+  color: #374151 !important;
+  font-weight: bold !important;
+  vertical-align: middle !important;
+}
+
+#confirmation-card table.data-table td:first-child {
+  vertical-align: middle !important;
+  white-space: pre-line !important;
+}
+
+table.data-table th {
+  background-color: #f5f7fa !important;
+  color: #374151 !important;
+  font-weight: bold !important;
+}
+
+.error {
+  color: #d32f2f;
+  margin-top: 12px;
+  font-weight: bold;
+  text-align: center;
+  font-size: 14px;
+}
+
+#confirmation-card {
+  width: 100% !important;
+  max-width: 750px !important;
+  margin: 0 auto !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  background-color: #ffffff !important;
+}
+
+/* ============================================================
+   PDF 페이지 끊김 방지
+   ============================================================ */
+
+#confirmation-card tr,
+.signature-area,
+.pdf-avoid-break {
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+}
+
+.section-title {
+  page-break-after: avoid !important;
+  break-after: avoid !important;
+  background-color: #406093;
+  color: white;
+  padding: 8px 12px;
+  font-weight: bold;
+  margin-top: 16px;
+  font-size: 14.5px;
+  text-align: center;
+  border-radius: 4px 4px 0 0;
+}
+
+#confirmation-card > div:first-child {
+  font-size: 13.5px !important;
+  font-weight: 600;
+  color: #374151;
+  padding: 8px 12px !important;
+  background-color: #f5f7fa;
+  border: 1px solid #e2e7ed;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.btn-clear {
+  display: inline-block !important;
+  width: auto !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  margin-top: 6px !important;
+  padding: 0 12px !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  color: #7a8491 !important;
+  background-color: #e6e9ee !important;
+  border: none !important;
+  border-radius: 4px !important;
+  cursor: pointer;
+}
+
+.submit-action-area {
+  margin-top: 16px !important;
+  margin-bottom: 20px !important;
+  text-align: center !important;
+}
+
+.btn-submit {
+  display: inline-block !important;
+  width: 100% !important;
+  max-width: 220px !important;
+  height: 42px !important;
+  line-height: 42px !important;
+  padding: 0 16px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+  background-color: #406093 !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer;
+}
+
+.signature-area {
+  margin-top: 16px;
+  padding: 0;
+  text-align: center;
+}
+
+.signature-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.canvas-wrapper {
+  display: inline-block;
+  width: 100%;
+  max-width: 300px;
+}
+
+#sig-canvas {
+  width: 100%;
+  height: 100px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background-color: #ffffff;
+  touch-action: none;
+}
+
+#confirmation-card table.data-table tbody {
+  display: table-row-group !important;
+  vertical-align: middle !important;
+}
+
+#confirmation-card table.data-table tbody tr {
+  display: table-row !important;
+  vertical-align: middle !important;
+}
+
+/* ============================================================
+   모바일
+   ============================================================ */
+
+@media screen and (max-width: 768px) {
+  .container {
+    padding: 16px 12px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .summary-card-container {
+    flex-direction: column !important;
+  }
+
+  .summary-card {
+    width: 100% !important;
+  }
+
+  #confirmation-card table.data-table th,
+  #confirmation-card table.data-table td {
+    display: table-cell !important;
+    padding: 6px 3px !important;
+    font-size: 11.5px !important;
+    line-height: 1.35 !important;
+    vertical-align: middle !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* ============================================================
+   연락처 본인확인 영역
+   ============================================================ */
+
+.phone-verification-area {
+  width: 100%;
+  max-width: 520px;
+  margin: 24px auto 0;
+  padding: 20px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.phone-verification-title {
+  width: 100%;
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #26364d;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.phone-verification-sub {
+  width: 100%;
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #7a8491;
+  text-align: center;
+  word-break: keep-all;
+}
+
+/* 입력창 + 확인 버튼을 세로 배치 */
+
+.phone-input-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* 연락처 입력창 */
+
+.phone-input-row input[type="tel"] {
+  display: block;
+  width: 100%;
+  height: 44px;
+  min-width: 0;
+  margin: 0;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 1px solid #d5dbe3;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 15px;
+  color: #374151;
+  text-align: center;
+  outline: none;
+}
+
+.phone-input-row input[type="tel"]::placeholder {
+  color: #9aa3af;
+}
+
+/* 확인 버튼 */
+
+.phone-input-row #phoneVerifyButton {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 44px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 8px;
+  background: #406093;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+}
+
+.phone-input-row #phoneVerifyButton:hover {
+  background: #334f7b;
+}
+
+/* ============================================================
+   모바일
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .phone-verification-area {
+    width: 100%;
+    max-width: 100%;
+    padding: 16px 12px;
+  }
+
+  .phone-input-row {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .phone-verification-title {
+    font-size: 17px;
+  }
+
+  .phone-verification-sub {
+    font-size: 13px;
+  }
+}

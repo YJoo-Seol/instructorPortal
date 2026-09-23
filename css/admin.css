@@ -1,0 +1,937 @@
+/* ============================================================
+   1. 전체 레이아웃 및 헤더
+   ============================================================ */
+
+.admin-container {
+  width: 100%;
+  max-width: 1200px;
+  width: calc(100% - 24px);
+  margin: 40px auto;
+  padding: 32px 28px;
+  background: #fff;
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 4px 16px rgba(31, 41, 55, 0.08);
+  box-sizing: border-box;
+}
+
+.portal-header {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.portal-header-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding-bottom: 18px;
+}
+
+.portal-title {
+  font-weight: 700;
+  color: #406093;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.instructor-number {
+  margin: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7a8491;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   2. 날짜 조회
+   ============================================================ */
+
+.admin-search {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.date-select-row {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.date-input-wrap {
+  flex: 1;
+}
+
+.date-input-wrap label {
+  margin-bottom: 8px;
+}
+
+.date-input-wrap input {
+  width: 100%;
+}
+
+.date-arrow {
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 42px;
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.today-btn,
+.search-btn {
+  width: auto;
+  min-width: 70px;
+  height: 42px;
+  margin: 0;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.today-btn {
+  background: #6b7280;
+}
+
+.today-btn:hover {
+  background: #4b5563;
+}
+
+/* ============================================================
+   3. 조회 날짜
+   ============================================================ */
+
+.selected-date {
+  margin: 8px 0 20px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #555;
+}
+
+/* ============================================================
+   4. 요약
+   ============================================================ */
+
+.summary-wrap {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.summary-item {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.summary-label {
+  margin-bottom: 5px;
+  font-size: 13px;
+  color: #666;
+}
+
+.summary-number {
+  font-size: 25px;
+  font-weight: 700;
+  color: #333;
+}
+
+.summary-item.complete {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.summary-item.complete .summary-number {
+  color: #15803d;
+}
+
+.summary-item.incomplete {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.summary-item.incomplete .summary-number {
+  color: #ea580c;
+}
+
+/* ============================================================
+   5. 출강 목록
+   ============================================================ */
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ============================================================
+   6. 출강 카드
+   ============================================================ */
+
+.dispatch-card {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.dispatch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dispatch-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #406093;
+}
+
+.dispatch-date {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.dispatch-info {
+  display: flex;
+  align-items: center;
+  /* justify-self: center; */
+  gap: 7px;
+  padding: 10px 18px;
+  font-size: 14px;
+  color: #555;
+  /* border-bottom: 1px solid #f1f5f9; */
+}
+.dispatch-info .time {
+  font-weight: 600;
+}
+.info-divider {
+  color: #aaa;
+}
+
+/* ============================================================
+   7. 강사 목록
+   PC / 태블릿 = 주강사 | 보조강사 2열
+   역할 + 강사명 한 줄
+   보고는 하단
+   ============================================================ */
+
+.teacher-list {
+  width: 100%;
+  max-width: 800px;
+
+  margin: 10px auto 14px;
+  padding: 14px 10px 16px;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   주강사 / 보조강사 블록
+   ============================================================ */
+
+.teacher-block {
+  min-width: 0;
+  padding-left: 24px;
+
+  display: grid;
+
+  grid-template-columns: max-content max-content;
+  grid-template-rows: auto auto;
+
+  column-gap: 8px;
+  row-gap: 4px;
+
+  justify-content: center;
+  align-items: center;
+
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   보조강사 영역 구분
+   ============================================================ */
+
+.teacher-block + .teacher-block {
+  margin-top: 0;
+  padding-left: 24px;
+}
+
+/* ============================================================
+   주강사 / 보조강사 서브 타이틀
+   ============================================================ */
+
+.teacher-type {
+  grid-column: 1;
+  grid-row: 1;
+
+  width: auto;
+  margin: 0;
+
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 28px;
+
+  color: #666;
+
+  text-align: left;
+}
+
+/* ============================================================
+   강사명
+   ============================================================ */
+
+.teacher-row {
+  display: contents;
+}
+
+/*
+   teacher-row를 contents로 만들기 때문에
+   teacher-name이 teacher-block의 grid에 직접 참여
+*/
+
+.teacher-name {
+  grid-column: 2;
+  grid-row: 1;
+
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 28px;
+
+  color: #222;
+
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* ============================================================
+   주강사 보고
+   ============================================================ */
+
+.report-status-wrap {
+  grid-column: 1 / -1;
+  grid-row: 2;
+
+  min-width: 0;
+
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+
+  padding-left: 0;
+}
+
+/* ============================================================
+   보조강사 보고
+   ============================================================ */
+
+.assistant-status {
+  grid-column: 1 / -1;
+  grid-row: 2;
+
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  justify-content: flex-start;
+  align-items: flex-start;
+
+  gap: 3px;
+}
+
+/* ============================================================
+   각각의 보고 한 줄
+   ============================================================ */
+
+.report-item,
+.assistant-report-item {
+  min-height: 28px;
+
+  display: flex;
+  align-items: center;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   보고 상태 박스
+   기존 색상 유지
+   ============================================================ */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 28px;
+
+  padding: 5px 9px;
+
+  border-radius: 6px;
+
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+
+  box-sizing: border-box;
+
+  white-space: nowrap;
+}
+
+/* 제출 완료 */
+
+.status-complete {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+/* 미제출 */
+
+.status-incomplete {
+  color: #c2410c;
+  background: #ffedd5;
+}
+
+/* 해당 없음 */
+
+.status-none {
+  color: #999;
+  background: #f3f4f6;
+}
+
+/* ============================================================
+   보고 시간
+   박스 바깥에 별도 표시
+   ============================================================ */
+
+.report-time {
+  display: inline-flex;
+  align-items: center;
+
+  margin-left: 6px;
+
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 28px;
+
+  color: #15803d;
+
+  white-space: nowrap;
+}
+
+/* ============================================================
+   기타 대체 운영진 관련
+   ============================================================ */
+
+.substitute {
+  background: #fafafa;
+}
+
+.substitute-label {
+  margin-right: 8px;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  color: #6b7280;
+}
+
+.substitute-status {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 6px;
+
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   9. 로딩 / 오류 / 빈 상태
+   ============================================================ */
+
+.loading-message,
+.empty-message,
+.error-message {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.loading-message {
+  color: #666;
+}
+
+.empty-message {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #777;
+}
+
+.error-message {
+  margin-bottom: 16px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+/* ============================================================
+   10. 날짜 이동 네비게이션
+   ============================================================ */
+
+.date-nav-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  margin: 16px 0;
+  background: transparent;
+}
+
+.date-nav-arrow {
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  color: #406093;
+  user-select: none;
+  padding: 4px;
+}
+
+.date-nav-arrow:hover {
+  opacity: 0.7;
+}
+
+.date-nav-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: #406093;
+  cursor: pointer;
+}
+
+.date-nav-text:hover {
+  text-decoration: underline;
+}
+
+.date-nav-range {
+  text-align: center;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #7a8491;
+  font-weight: 400;
+}
+
+@media screen and (max-width: 768px) {
+  .container {
+    width: calc(100% - 24px);
+    margin: 16px auto;
+    padding: 20px 14px;
+  }
+
+  /* ==========================================================
+     검색
+     ========================================================== */
+
+  .admin-search {
+    flex-wrap: wrap;
+  }
+
+  .date-select-row {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .today-btn,
+  .search-btn {
+    flex: 1;
+  }
+
+  /* ==========================================================
+     요약
+     ========================================================== */
+
+  .summary-wrap {
+    gap: 8px;
+  }
+
+  .summary-item {
+    padding: 13px 8px;
+  }
+
+  .summary-number {
+    font-size: 22px;
+  }
+
+  /* ==========================================================
+     카드
+     ========================================================== */
+
+  .dispatch-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .dispatch-title {
+    font-size: 18px;
+    color: #406093;
+    text-align: center;
+  }
+
+  /* ==========================================================
+     강사 목록
+     모바일 = 1열
+     ========================================================== */
+
+  .teacher-list {
+    width: 100%;
+    max-width: none;
+
+    margin: 10px 0 14px;
+    padding: 14px 16px 16px;
+
+    display: block;
+
+    box-sizing: border-box;
+  }
+
+  /* ==========================================================
+     주강사 / 보조강사 블록
+     ========================================================== */
+
+  .teacher-block {
+    width: 100%;
+    min-width: 0;
+
+    display: grid;
+
+    /*
+      첫 번째 줄
+      [주강사] [강사명]
+
+      두 번째 줄
+      [보고 ----------------]
+    */
+
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-rows: auto auto;
+
+    column-gap: 10px;
+    row-gap: 10px;
+
+    justify-content: start;
+    align-items: center;
+
+    box-sizing: border-box;
+  }
+
+  /* ==========================================================
+     주강사 → 보조강사 구분
+     기존 구분선 유지
+     ========================================================== */
+
+  .teacher-block + .teacher-block {
+    margin-top: 16px;
+    padding-top: 14px;
+
+    border-top: 1px solid #e5e7eb;
+  }
+
+  /* ==========================================================
+     주강사 / 보조강사 서브타이틀
+     기존 왼쪽 파란 보더 유지
+     ========================================================== */
+
+  .teacher-type {
+    grid-column: 1;
+    grid-row: 1;
+
+    width: auto;
+
+    margin: 0;
+    padding-left: 8px;
+
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 28px;
+
+    color: #406093;
+
+    text-align: left;
+    white-space: nowrap;
+
+    border-left: 3px solid #4c8ce4;
+
+    box-sizing: border-box;
+  }
+
+  /* ==========================================================
+     기존 teacher-row는 레이아웃 껍데기만 제거
+     안쪽 요소가 teacher-block의 grid에 직접 참여
+     ========================================================== */
+
+  .teacher-row {
+    display: contents;
+  }
+
+  /* ==========================================================
+     강사명
+     서브타이틀 우측에 바로 표시
+     ========================================================== */
+
+  .teacher-name {
+    grid-column: 2;
+    grid-row: 1;
+
+    min-width: 0;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 28px;
+
+    color: #222;
+
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  /* ==========================================================
+     주강사 종료보고
+     서브타이틀 바로 아래
+     ========================================================== */
+
+  .report-status-wrap {
+    grid-column: 1 / -1;
+    grid-row: 2;
+
+    min-width: 0;
+
+    display: flex;
+
+    justify-content: flex-start;
+    align-items: flex-start;
+
+    box-sizing: border-box;
+  }
+
+  /* ==========================================================
+     보조강사 시작 / 종료보고
+     서브타이틀 바로 아래에서 세로 배치
+     ========================================================== */
+
+  .assistant-status {
+    grid-column: 1 / -1;
+    grid-row: 2;
+
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+
+    justify-content: flex-start;
+    align-items: flex-start;
+
+    gap: 3px;
+
+    box-sizing: border-box;
+  }
+
+  /* ==========================================================
+     보고 한 줄
+     ========================================================== */
+
+  .report-item,
+  .assistant-report-item {
+    min-height: 28px;
+
+    display: flex;
+    align-items: center;
+
+    white-space: nowrap;
+
+    box-sizing: border-box;
+  }
+
+  /* ==========================================================
+     보고 상태 박스
+     ========================================================== */
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+
+    min-height: 28px;
+
+    padding: 5px 9px;
+
+    border-radius: 6px;
+
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+
+    box-sizing: border-box;
+
+    white-space: nowrap;
+  }
+
+  /* 제출 완료 */
+
+  .status-complete {
+    color: #15803d;
+    background: #dcfce7;
+  }
+
+  /* 미제출 */
+
+  .status-incomplete {
+    color: #c2410c;
+    background: #ffedd5;
+  }
+
+  /* 해당 없음 */
+
+  .status-none {
+    color: #999;
+    background: #f3f4f6;
+  }
+
+  /* ==========================================================
+     보고 시간
+     박스 바깥 오른쪽
+     ========================================================== */
+
+  .report-time {
+    display: inline-flex;
+    align-items: center;
+
+    margin-left: 6px;
+
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 28px;
+
+    color: #15803d;
+
+    white-space: nowrap;
+  }
+
+  /* ==========================================================
+     대체 운영진
+     ========================================================== */
+
+  .substitute {
+    background: #fafafa;
+  }
+
+  .substitute-label {
+    margin: 0;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    color: #6b7280;
+
+    text-align: left;
+  }
+
+  .substitute-status {
+    justify-content: flex-start;
+  }
+}
+
+/* ============================================================
+   12. 작은 화면
+   ============================================================ */
+
+@media screen and (max-width: 380px) {
+  .date-arrow {
+    width: 36px;
+    flex-basis: 36px;
+  }
+
+  .summary-label {
+    font-size: 12px;
+  }
+
+  .summary-number {
+    font-size: 20px;
+  }
+
+  .dispatch-info {
+    font-size: 13px;
+  }
+
+  .status {
+    font-size: 11px;
+    padding: 4px 7px;
+  }
+
+  .teacher-list {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .teacher-block {
+    column-gap: 8px;
+  }
+
+  .teacher-type {
+    padding-left: 7px;
+  }
+
+  .teacher-name {
+    font-size: 15px;
+  }
+
+  .report-time {
+    font-size: 11px;
+  }
+}
+
+/* ============================================================
+   12. 반응형 미디어 쿼리
+   ============================================================ */
+
+@media screen and (min-width: 769px) {
+  .teacher-block + .teacher-block {
+    border-left: 1px solid #e5e7eb;
+  }
+  .teacher-type {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+    margin: 0;
+    padding-left: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 28px;
+    color: #406093;
+    text-align: left;
+    white-space: nowrap;
+    border-left: 3px solid #4c8ce4;
+    box-sizing: border-box;
+  }
+  .teacher-block {
+    gap: 10px;
+  }
+}
