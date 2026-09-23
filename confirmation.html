@@ -1,177 +1,181 @@
 <!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <link rel="stylesheet" href="css/common.css" />
-    <link rel="stylesheet" href="css/confirmation.css" />
+		<link rel="stylesheet" href="css/common.css" />
+		<link rel="stylesheet" href="css/confirmation.css" />
 
-    <!-- PDF 생성 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  </head>
+		<!-- PDF 생성 -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+	</head>
 
-  <body>
-    <main class="page">
-      <div class="container">
-        <!-- 상단 -->
-        <div class="portal-header">
-          <h1 class="portal-title">창의배움터 강사 포털</h1>
+	<body>
+		<main class="page">
+			<div class="container">
+				<!-- 상단 -->
+				<div class="portal-header">
+					<h1 class="portal-title">창의배움터 강사 포털</h1>
 
-          <!-- 로그인된 강사 정보 및 강사번호 통합 표시 -->
-          <div class="logged-in-user">
-            <span id="displayName" class="info-value"><b>-</b> 님</span>
-            <span class="instructor-sub-info"
-              >강사번호: <span id="instructorNo">-</span></span
-            >
-          </div>
+					<!-- 로그인된 강사 정보 및 강사번호 통합 표시 -->
+					<div class="logged-in-user">
+						<span id="displayName" class="info-value"><b>-</b> 님</span>
+						<span class="instructor-sub-info"
+							>강사번호: <span id="instructorNo">-</span></span
+						>
+					</div>
 
-          <!-- 공통 탭 네비게이션 -->
-          <div class="page-nav">
-            <a href="schedule.html" class="page-nav-item">출강 일정</a>
-            <a href="confirmation.html" class="page-nav-item active"
-              >강사확인서</a
-            >
-            <!-- <a href="admin.html" class="page-nav-item">대시보드</a> -->
-          </div>
-        </div>
+					<!-- 공통 탭 네비게이션 -->
+					<div class="page-nav">
+						<a href="schedule.html" class="page-nav-item">출강 일정</a>
+						<a href="confirmation.html" class="page-nav-item active"
+							>강사확인서</a
+						>
+						<!-- <a href="admin.html" class="page-nav-item">대시보드</a> -->
+					</div>
+				</div>
 
-        <!-- 연락처 본인확인 -->
-        <section id="phoneVerificationArea" class="phone-verification-area">
-          <div class="phone-verification-title">연락처를 입력해주세요.</div>
+				<!-- 연락처 본인확인 -->
+				<section
+					id="phoneVerificationArea"
+					class="phone-verification-area"
+					style="display: none"
+				>
+					<div class="phone-verification-title">연락처를 입력해주세요.</div>
 
-          <div class="phone-verification-sub">
-            강사확인서 조회를 위해 본인 확인이 필요합니다.
-          </div>
+					<div class="phone-verification-sub">
+						강사확인서 조회를 위해 본인 확인이 필요합니다.
+					</div>
 
-          <div class="phone-input-row">
-            <input
-              type="tel"
-              id="confirmationPhoneInput"
-              placeholder="연락처 뒤 8자리"
-              maxlength="8"
-              inputmode="numeric"
-              autocomplete="off"
-            />
+					<div class="phone-input-row">
+						<input
+							type="tel"
+							id="confirmationPhoneInput"
+							placeholder="연락처 뒤 8자리"
+							maxlength="8"
+							inputmode="numeric"
+							autocomplete="off"
+						/>
 
-            <button
-              type="button"
-              id="phoneVerifyButton"
-              onclick="verifyConfirmationPhone()"
-            >
-              확인
-            </button>
-          </div>
-        </section>
+						<button
+							type="button"
+							id="phoneVerifyButton"
+							onclick="verifyConfirmationPhone()"
+						>
+							확인
+						</button>
+					</div>
+				</section>
 
-        <!-- 로딩 / 오류 -->
-        <div id="message" class="message"></div>
+				<!-- 로딩 / 오류 -->
+				<div id="message" class="message"></div>
 
-        <!-- 강사확인서 -->
-        <section id="confirmationArea" style="display: none">
-          <div id="confirmationDocument">
-            <!-- 확인서 제목 -->
-            <div class="document-header">
-              <h2>강사확인서</h2>
+				<!-- 강사확인서 -->
+				<section id="confirmationArea" style="display: none">
+					<div id="confirmationDocument">
+						<!-- 확인서 제목 -->
+						<div class="document-header">
+							<h2>강사확인서</h2>
 
-              <div class="document-month">
-                <span id="documentMonth"></span>
-              </div>
-            </div>
+							<div class="document-month">
+								<span id="documentMonth"></span>
+							</div>
+						</div>
 
-            <!-- 기본 정보 -->
-            <table class="confirmation-table info-table">
-              <tbody>
-                <tr>
-                  <th>강사명</th>
-                  <td id="documentName"></td>
-                </tr>
+						<!-- 기본 정보 -->
+						<table class="confirmation-table info-table">
+							<tbody>
+								<tr>
+									<th>강사명</th>
+									<td id="documentName"></td>
+								</tr>
 
-                <tr>
-                  <th>연락처</th>
-                  <td id="documentPhone"></td>
-                </tr>
+								<tr>
+									<th>연락처</th>
+									<td id="documentPhone"></td>
+								</tr>
 
-                <tr>
-                  <th>구분</th>
-                  <td id="documentRole"></td>
-                </tr>
-              </tbody>
-            </table>
+								<tr>
+									<th>구분</th>
+									<td id="documentRole"></td>
+								</tr>
+							</tbody>
+						</table>
 
-            <!-- 출강 내역 -->
-            <div class="section-title">출강 내역</div>
+						<!-- 출강 내역 -->
+						<div class="section-title">출강 내역</div>
 
-            <div class="table-wrapper">
-              <table class="confirmation-table schedule-table">
-                <thead>
-                  <tr>
-                    <th>일자</th>
-                    <th>프로그램</th>
-                    <th>시설</th>
-                    <th>시간</th>
-                    <th>차시</th>
-                    <th>강사료</th>
-                  </tr>
-                </thead>
+						<div class="table-wrapper">
+							<table class="confirmation-table schedule-table">
+								<thead>
+									<tr>
+										<th>일자</th>
+										<th>프로그램</th>
+										<th>시설</th>
+										<th>시간</th>
+										<th>차시</th>
+										<th>강사료</th>
+									</tr>
+								</thead>
 
-                <tbody id="scheduleTableBody"></tbody>
-              </table>
-            </div>
+								<tbody id="scheduleTableBody"></tbody>
+							</table>
+						</div>
 
-            <!-- 합계 -->
-            <table class="confirmation-table summary-table">
-              <tbody>
-                <tr>
-                  <th>총 차시</th>
-                  <td id="totalHours"></td>
-                </tr>
+						<!-- 합계 -->
+						<table class="confirmation-table summary-table">
+							<tbody>
+								<tr>
+									<th>총 차시</th>
+									<td id="totalHours"></td>
+								</tr>
 
-                <tr>
-                  <th>총 강사료</th>
-                  <td id="totalPay"></td>
-                </tr>
-              </tbody>
-            </table>
+								<tr>
+									<th>총 강사료</th>
+									<td id="totalPay"></td>
+								</tr>
+							</tbody>
+						</table>
 
-            <!-- 확인 문구 -->
-            <div class="confirmation-text">
-              <p>위와 같이 출강하였음을 확인합니다.</p>
-            </div>
+						<!-- 확인 문구 -->
+						<div class="confirmation-text">
+							<p>위와 같이 출강하였음을 확인합니다.</p>
+						</div>
 
-            <!-- 서명 -->
-            <div class="signature-area">
-              <div class="signature-title">강사 서명</div>
+						<!-- 서명 -->
+						<div class="signature-area">
+							<div class="signature-title">강사 서명</div>
 
-              <div class="signature-box">
-                <canvas id="sig-canvas" width="600" height="220"></canvas>
-              </div>
+							<div class="signature-box">
+								<canvas id="sig-canvas" width="600" height="220"></canvas>
+							</div>
 
-              <button
-                type="button"
-                class="clear-signature-button"
-                onclick="clearCanvas()"
-              >
-                서명 지우기
-              </button>
-            </div>
-          </div>
+							<button
+								type="button"
+								class="clear-signature-button"
+								onclick="clearCanvas()"
+							>
+								서명 지우기
+							</button>
+						</div>
+					</div>
 
-          <!-- 저장 버튼 -->
-          <div class="action-area submit-action-area" id="submit-action-area">
-            <button
-              type="button"
-              id="submitButton"
-              class="btn-submit"
-              onclick="submitSignature()"
-            >
-              서명 후 제출
-            </button>
-          </div>
-        </section>
-      </div>
-    </main>
+					<!-- 저장 버튼 -->
+					<div class="action-area submit-action-area" id="submit-action-area">
+						<button
+							type="button"
+							id="submitButton"
+							class="btn-submit"
+							onclick="submitSignature()"
+						>
+							서명 후 제출
+						</button>
+					</div>
+				</section>
+			</div>
+		</main>
 
-    <script src="js/confirmation.js"></script>
-  </body>
+		<script src="js/confirmation.js"></script>
+	</body>
 </html>

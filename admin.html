@@ -1,169 +1,170 @@
 <!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
+	<head>
+		<meta charset="UTF-8" />
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>운영진 대시보드 | 창의배움터 강사 포털</title>
+		<title>운영진 대시보드 | 창의배움터 강사 포털</title>
 
-    <link rel="stylesheet" href="css/common.css" />
-    <link rel="stylesheet" href="css/admin.css" />
-  </head>
+		<link rel="stylesheet" href="css/common.css" />
+		<link rel="stylesheet" href="css/admin.css" />
+	</head>
 
-  <body>
-    <div class="container admin-container">
-      <!-- ======================================================
+	<body>
+		<div class="container admin-container">
+			<!-- ======================================================
          운영진 대시보드 헤더
          ====================================================== -->
 
-      <div class="portal-header">
-        <div class="portal-title">
-          <h1>운영진 대시보드</h1>
-        </div>
+			<div class="portal-header">
+				<div class="portal-title">
+					<h1>운영진 대시보드</h1>
+				</div>
 
-        <!-- ====================================================
+				<!-- ====================================================
            공통 탭 네비게이션
            ==================================================== -->
 
-        <div class="page-nav">
-          <a href="schedule.html" class="page-nav-item"> 출강 일정 </a>
+				<div class="page-nav">
+					<a href="schedule.html" class="page-nav-item"> 출강 일정 </a>
 
-          <a href="confirmation.html" class="page-nav-item"> 강사확인서 </a>
+					<a href="confirmation.html" class="page-nav-item"> 강사확인서 </a>
 
-          <a href="admin.html" class="page-nav-item active"> 대시보드 </a>
-        </div>
-      </div>
+					<a href="admin.html" class="page-nav-item active"> 대시보드 </a>
+				</div>
+			</div>
 
-      <!-- ======================================================
+			<!-- ======================================================
          운영진 확인
          인증 전 표시
          ====================================================== -->
 
-      <section id="adminVerificationArea" class="phone-verification-area">
-        <div class="phone-verification-title">운영진 확인이 필요합니다.</div>
+			<section id="adminVerificationArea" class="phone-verification-area">
+				<div class="phone-verification-title">운영진 확인이 필요합니다.</div>
 
-        <div class="phone-verification-sub">
-          운영진 대시보드 조회를 위해 확인번호를 입력해주세요.
-        </div>
+				<div class="phone-verification-sub">
+					운영진 대시보드 조회를 위해 확인번호를 입력해주세요.
+				</div>
 
-        <div class="phone-input-row">
-          <input
-            type="password"
-            id="adminAuthInput"
-            placeholder="확인번호를 입력해주세요."
-            maxlength="8"
-            inputmode="numeric"
-            autocomplete="off"
-            onkeydown="handleAdminAuthKeydown(event)"
-          />
+				<div class="phone-input-row">
+					<input
+						type="password"
+						id="adminAuthInput"
+						placeholder="확인번호를 입력해주세요."
+						maxlength="8"
+						inputmode="numeric"
+						autocomplete="off"
+						onkeydown="handleAdminAuthKeydown(event)"
+					/>
 
-          <button
-            type="button"
-            id="adminVerifyButton"
-            onclick="verifyAdminAccess()"
-          >
-            확인
-          </button>
-        </div>
-      </section>
+					<button
+						type="button"
+						id="adminVerifyButton"
+						onclick="verifyAdminAccess()"
+					>
+						확인
+					</button>
+				</div>
+			</section>
 
-      <!-- ======================================================
+			<!-- ======================================================
          운영진 대시보드
          인증 성공 후 표시
          ====================================================== -->
 
-      <section id="adminDashboardArea" style="display: none">
-        <!-- ====================================================
+			<section id="adminDashboardArea" style="display: none">
+				<!-- ====================================================
            날짜 조회
            ==================================================== -->
 
-        <div id="dateNavRange" class="date-nav-range"></div>
+				<div id="dateNavRange" class="date-nav-range"></div>
 
-        <div class="date-nav-container">
-          <span
-            class="date-nav-arrow"
-            onclick="moveDate(-1)"
-            aria-label="이전 날짜"
-          >
-            ◀
-          </span>
+				<div class="date-nav-container">
+					<span
+						class="date-nav-arrow"
+						onclick="moveDate(-1)"
+						aria-label="이전 날짜"
+					>
+						◀
+					</span>
 
-          <span
-            id="dateNavDisplay"
-            class="date-nav-text"
-            onclick="resetToToday()"
-            title="오늘 날짜로 이동"
-          >
-          </span>
+					<span
+						id="dateNavDisplay"
+						class="date-nav-text"
+						onclick="resetToToday()"
+						title="오늘 날짜로 이동"
+					>
+					</span>
 
-          <span
-            class="date-nav-arrow"
-            onclick="moveDate(1)"
-            aria-label="다음 날짜"
-          >
-            ▶
-          </span>
-        </div>
+					<span
+						class="date-nav-arrow"
+						onclick="moveDate(1)"
+						aria-label="다음 날짜"
+					>
+						▶
+					</span>
+				</div>
 
-        <!-- ====================================================
+				<!-- ====================================================
            요약
            ==================================================== -->
 
-        <div class="summary-wrap">
-          <div class="summary-item">
-            <div class="summary-label">전체</div>
+				<div class="summary-wrap">
+					<div class="summary-item">
+						<div class="summary-label">전체</div>
 
-            <div id="totalCount" class="summary-number">0</div>
-          </div>
+						<div id="totalCount" class="summary-number">0</div>
+					</div>
 
-          <div class="summary-item complete">
-            <div class="summary-label">완료</div>
+					<div class="summary-item complete">
+						<div class="summary-label">완료</div>
 
-            <div id="completeCount" class="summary-number">0</div>
-          </div>
+						<div id="completeCount" class="summary-number">0</div>
+					</div>
 
-          <div class="summary-item incomplete">
-            <div class="summary-label">미제출</div>
+					<div class="summary-item incomplete">
+						<div class="summary-label">미제출</div>
 
-            <div id="incompleteCount" class="summary-number">0</div>
-          </div>
-        </div>
+						<div id="incompleteCount" class="summary-number">0</div>
+					</div>
+				</div>
 
-        <!-- ====================================================
+				<!-- ====================================================
            로딩
            ==================================================== -->
 
-        <div id="loadingMessage" class="loading-message" style="display: none">
-          보고 현황을 불러오는 중입니다...
-        </div>
+				<div id="loadingMessage" class="loading-message" style="display: none">
+					보고 현황을 불러오는 중입니다...
+				</div>
 
-        <!-- ====================================================
+				<!-- ====================================================
            오류
            ==================================================== -->
 
-        <div
-          id="errorMessage"
-          class="error-message"
-          style="display: none"
-        ></div>
+				<div
+					id="errorMessage"
+					class="error-message"
+					style="display: none"
+				></div>
 
-        <!-- ====================================================
+				<!-- ====================================================
            일정 없음
            ==================================================== -->
 
-        <div id="emptyMessage" class="empty-message" style="display: none">
-          해당 날짜에 등록된 출강 일정이 없습니다.
-        </div>
+				<div id="emptyMessage" class="empty-message" style="display: none">
+					해당 날짜에 등록된 출강 일정이 없습니다.
+				</div>
 
-        <!-- ====================================================
+				<!-- ====================================================
            출강 현황
            ==================================================== -->
 
-        <div id="adminList" class="admin-list"></div>
-      </section>
-    </div>
+				<div id="adminList" class="admin-list"></div>
+			</section>
+		</div>
 
-    <script src="js/admin.js"></script>
-  </body>
+		<script src="js/push.js"></script>
+		<script src="js/admin.js"></script>
+	</body>
 </html>

@@ -1,92 +1,92 @@
 <!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>창의배움터 강사 포털</title>
+		<title>창의배움터 강사 포털</title>
 
-    <!-- 카카오톡 / SNS 링크 미리보기 (Open Graph) 설정 -->
-    <meta property="og:type" content="website" />
-    <meta
-      property="og:url"
-      content="https://bnkedu.github.io/instructorPortal/"
-    />
-    <meta property="og:title" content="창의배움터 강사 포털" />
-    <meta property="og:description" content="여기를 눌러 일정을 조회하세요." />
-    <meta
-      property="og:image"
-      content="https://bnkedu.github.io/instructorPortal/og-image.png"
-    />
+		<!-- 카카오톡 / SNS 링크 미리보기 (Open Graph) 설정 -->
+		<meta property="og:type" content="website" />
+		<meta
+			property="og:url"
+			content="https://bnkedu.github.io/instructorPortal/"
+		/>
+		<meta property="og:title" content="창의배움터 강사 포털" />
+		<meta property="og:description" content="여기를 눌러 일정을 조회하세요." />
+		<meta
+			property="og:image"
+			content="https://bnkedu.github.io/instructorPortal/og-image.png"
+		/>
 
-    <link rel="stylesheet" href="css/common.css" />
-  </head>
+		<link rel="stylesheet" href="css/common.css" />
+	</head>
 
-  <body>
-    <main class="page">
-      <div class="container">
-        <h1 class="page-title">창의배움터 강사 포털</h1>
-        <p class="page-description">
-          강사번호를 입력하면 출강 일정과 보고 현황을 확인할 수 있습니다.
-        </p>
+	<body>
+		<main class="page">
+			<div class="container">
+				<h1 class="page-title">창의배움터 강사 포털</h1>
+				<p class="page-description">
+					강사번호를 입력하면 출강 일정과 보고 현황을 확인할 수 있습니다.
+				</p>
 
-        <!-- 강사번호 검색 -->
-        <section class="search-card">
-          <label class="field-label" for="instructorNo"> 강사번호 </label>
+				<!-- 강사번호 검색 -->
+				<section class="search-card">
+					<label class="field-label" for="instructorNo"> 강사번호 </label>
 
-          <input
-            type="text"
-            id="instructorNo"
-            class="input"
-            placeholder="강사번호를 입력해주세요."
-            autocomplete="off"
-          />
+					<input
+						type="text"
+						id="instructorNo"
+						class="input"
+						placeholder="강사번호를 입력해주세요. 이름+전화번호 뒤 4자리"
+						autocomplete="off"
+					/>
 
-          <button
-            type="button"
-            id="searchButton"
-            class="search-button"
-            onclick="searchInstructor()"
-          >
-            조회
-          </button>
+					<button
+						type="button"
+						id="searchButton"
+						class="search-button"
+						onclick="searchInstructor()"
+					>
+						조회
+					</button>
 
-          <div id="message" class="message"></div>
-        </section>
+					<div id="message" class="message"></div>
+				</section>
 
-        <!-- 조회 결과 -->
-        <section id="result" class="result">
-          <div class="result-row">
-            <span class="result-label">강사명</span>
-            <span id="resultName" class="result-value"></span>
-          </div>
+				<!-- 조회 결과 -->
+				<section id="result" class="result">
+					<div class="result-row">
+						<span class="result-label">강사명</span>
+						<span id="resultName" class="result-value"></span>
+					</div>
 
-          <div class="result-row">
-            <span class="result-label">구분</span>
-            <span id="resultRole" class="role-badge"></span>
-          </div>
+					<div class="result-row">
+						<span class="result-label">구분</span>
+						<span id="resultRole" class="role-badge"></span>
+					</div>
 
-          <div class="navigation-buttons">
-            <button
-              type="button"
-              class="schedule-button"
-              onclick="goToSchedule()"
-            >
-              출강 일정 확인
-            </button>
+					<div class="navigation-buttons">
+						<button
+							type="button"
+							class="schedule-button"
+							onclick="goToSchedule()"
+						>
+							출강 일정 확인
+						</button>
 
-            <button
-              type="button"
-              class="schedule-button"
-              onclick="goToConfirmation()"
-            >
-              강사확인서
-            </button>
-          </div>
-        </section>
-      </div>
-    </main>
+						<button
+							type="button"
+							class="schedule-button"
+							onclick="goToConfirmation()"
+						>
+							강사확인서
+						</button>
+					</div>
+				</section>
+			</div>
+		</main>
 
-    <script src="js/index.js"></script>
-  </body>
+		<script src="js/index.js"></script>
+	</body>
 </html>

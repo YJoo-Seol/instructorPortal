@@ -12,7 +12,7 @@ let confirmationPhone = "";
    ============================================================ */
 
 document.addEventListener("DOMContentLoaded", function () {
-  loadInstructorData();
+	loadInstructorData();
 });
 
 /* ============================================================
@@ -20,351 +20,351 @@ document.addEventListener("DOMContentLoaded", function () {
    ============================================================ */
 
 function loadInstructorData() {
-  const stored = sessionStorage.getItem("instructorData");
+	const stored = sessionStorage.getItem("instructorData");
 
-  if (!stored) {
-    showVerificationPrompt();
-    return;
-  }
+	if (!stored) {
+		showVerificationPrompt();
+		return;
+	}
 
-  try {
-    instructorData = JSON.parse(stored);
-  } catch (error) {
-    console.error("강사 정보 파싱 오류:", error);
-    showVerificationPrompt();
-    return;
-  }
+	try {
+		instructorData = JSON.parse(stored);
+	} catch (error) {
+		console.error("강사 정보 파싱 오류:", error);
+		showVerificationPrompt();
+		return;
+	}
 
-  const name = instructorData.instructorName || "";
+	const name = instructorData.instructorName || "";
 
-  const role = instructorData.role || "";
+	const role = instructorData.role || "";
 
-  const instructorNo = instructorData.instructorNo || "";
+	const instructorNo = instructorData.instructorNo || "";
 
-  currentMonth = instructorData.month || "";
+	currentMonth = instructorData.month || "";
 
-  // ----------------------------------------------------------
-  // 상단 헤더
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 상단 헤더
+	// ----------------------------------------------------------
 
-  const displayNameEls = document.querySelectorAll("#displayName");
+	const displayNameEls = document.querySelectorAll("#displayName");
 
-  displayNameEls.forEach(function (element) {
-    element.innerHTML = `안녕하세요, <b>${escapeHtml(name || "-")}</b>님`;
-  });
+	displayNameEls.forEach(function (element) {
+		element.innerHTML = `안녕하세요, <b>${escapeHtml(name || "-")}</b>님`;
+	});
 
-  const instructorNoEl = document.getElementById("instructorNo");
+	const instructorNoEl = document.getElementById("instructorNo");
 
-  if (instructorNoEl) {
-    instructorNoEl.textContent = instructorNo || "-";
-  }
+	if (instructorNoEl) {
+		instructorNoEl.textContent = instructorNo || "-";
+	}
 
-  // ----------------------------------------------------------
-  // 기본 강사 정보
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 기본 강사 정보
+	// ----------------------------------------------------------
 
-  const phoneElement = document.getElementById("displayPhone");
+	const phoneElement = document.getElementById("displayPhone");
 
-  if (phoneElement) {
-    phoneElement.textContent = "-";
-  }
+	if (phoneElement) {
+		phoneElement.textContent = "-";
+	}
 
-  const roleElement = document.getElementById("displayRole");
+	const roleElement = document.getElementById("displayRole");
 
-  if (roleElement) {
-    roleElement.textContent = normalizeRole(role) || "-";
-  }
+	if (roleElement) {
+		roleElement.textContent = normalizeRole(role) || "-";
+	}
 
-  const monthElement = document.getElementById("displayMonth");
+	const monthElement = document.getElementById("displayMonth");
 
-  if (monthElement) {
-    monthElement.textContent = currentMonth
-      ? `${currentMonth}월 강사확인서`
-      : "강사확인서";
-  }
+	if (monthElement) {
+		monthElement.textContent = currentMonth
+			? `${currentMonth}월 강사확인서`
+			: "강사확인서";
+	}
 
-  // ----------------------------------------------------------
-  // ★ 가장 먼저 제출 상태 확인
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// ★ 가장 먼저 제출 상태 확인
+	// ----------------------------------------------------------
 
-  checkConfirmationPreStatus();
+	checkConfirmationPreStatus();
 }
 async function checkConfirmationPreStatus() {
-  if (!instructorData) {
-    showVerificationPrompt();
-    return;
-  }
+	if (!instructorData) {
+		showVerificationPrompt();
+		return;
+	}
 
-  const name = instructorData.instructorName || "";
+	const name = instructorData.instructorName || "";
 
-  const instructorNo = instructorData.instructorNo || "";
+	const instructorNo = instructorData.instructorNo || "";
 
-  try {
-    showMessage("강사확인서 상태를 확인하는 중입니다.", "loading");
+	try {
+		showMessage("강사확인서 상태를 확인하는 중입니다.", "loading");
 
-    const response = await fetch(API_URL, {
-      method: "POST",
+		const response = await fetch(API_URL, {
+			method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+			headers: {
+				"Content-Type": "application/json",
+			},
 
-      body: JSON.stringify({
-        action: "searchInstructorData",
+			body: JSON.stringify({
+				action: "searchInstructorData",
 
-        name: name,
+				name: name,
 
-        phone: "",
+				phone: "",
 
-        instructorNo: instructorNo,
+				instructorNo: instructorNo,
 
-        preCheck: true,
-      }),
-    });
+				preCheck: true,
+			}),
+		});
 
-    if (!response.ok) {
-      throw new Error("서버 응답 오류 (" + response.status + ")");
-    }
+		if (!response.ok) {
+			throw new Error("서버 응답 오류 (" + response.status + ")");
+		}
 
-    const data = await response.json();
+		const data = await response.json();
 
-    console.log("강사확인서 사전 상태:", data);
+		console.log("강사확인서 사전 상태:", data);
 
-    if (!data.success) {
-      throw new Error(data.message || "강사확인서 상태를 확인할 수 없습니다.");
-    }
+		if (!data.success) {
+			throw new Error(data.message || "강사확인서 상태를 확인할 수 없습니다.");
+		}
 
-    currentMonth = data.month || currentMonth;
+		currentMonth = data.month || currentMonth;
 
-    // ========================================
-    // 제출 기간 종료
-    // ========================================
+		// ========================================
+		// 제출 기간 종료
+		// ========================================
 
-    if (data.allowed === false && data.reason === "PERIOD_CLOSED") {
-      hideConfirmationAreas();
+		if (data.allowed === false && data.reason === "PERIOD_CLOSED") {
+			hideConfirmationAreas();
 
-      showMessage(
-        data.message || "현재 강사확인서 제출 기간이 아닙니다.",
-        "error",
-      );
+			showMessage(
+				data.message || "현재 강사확인서 제출 기간이 아닙니다.",
+				"error",
+			);
 
-      return;
-    }
+			return;
+		}
 
-    // ========================================
-    // 이미 제출 완료
-    // ========================================
+		// ========================================
+		// 이미 제출 완료
+		// ========================================
 
-    if (data.allowed === false && data.reason === "ALREADY_SUBMITTED") {
-      hideConfirmationAreas();
+		if (data.allowed === false && data.reason === "ALREADY_SUBMITTED") {
+			hideConfirmationAreas();
 
-      showMessage(
-        data.message || "이번 달 강사확인서는 이미 제출이 완료되었습니다.",
-        "error",
-      );
+			showMessage(
+				data.message || "이번 달 강사확인서는 이미 제출이 완료되었습니다.",
+				"error",
+			);
 
-      return;
-    }
+			return;
+		}
 
-    // ========================================
-    // 제출 가능
-    // ========================================
+		// ========================================
+		// 제출 가능
+		// ========================================
 
-    if (data.allowed === true) {
-      proceedToPhoneVerification();
+		if (data.allowed === true) {
+			proceedToPhoneVerification();
 
-      return;
-    }
+			return;
+		}
 
-    throw new Error("강사확인서 상태를 확인할 수 없습니다.");
-  } catch (error) {
-    console.error("강사확인서 사전 상태 확인 오류:", error);
+		throw new Error("강사확인서 상태를 확인할 수 없습니다.");
+	} catch (error) {
+		console.error("강사확인서 사전 상태 확인 오류:", error);
 
-    hideConfirmationAreas();
+		hideConfirmationAreas();
 
-    showMessage(
-      error.message || "강사확인서 상태를 확인하지 못했습니다.",
-      "error",
-    );
-  }
+		showMessage(
+			error.message || "강사확인서 상태를 확인하지 못했습니다.",
+			"error",
+		);
+	}
 }
 
 function hideConfirmationAreas() {
-  const verificationArea = document.getElementById("phoneVerificationArea");
+	const verificationArea = document.getElementById("phoneVerificationArea");
 
-  if (verificationArea) {
-    verificationArea.style.display = "none";
-  }
+	if (verificationArea) {
+		verificationArea.style.display = "none";
+	}
 
-  const confirmationArea = document.getElementById("confirmationArea");
+	const confirmationArea = document.getElementById("confirmationArea");
 
-  if (confirmationArea) {
-    confirmationArea.style.display = "none";
-  }
+	if (confirmationArea) {
+		confirmationArea.style.display = "none";
+	}
 }
 
 function proceedToPhoneVerification() {
-  if (!instructorData) {
-    showVerificationPrompt();
-    return;
-  }
+	if (!instructorData) {
+		showVerificationPrompt();
+		return;
+	}
 
-  const name = instructorData.instructorName || "";
+	const name = instructorData.instructorName || "";
 
-  const instructorNo = instructorData.instructorNo || "";
+	const instructorNo = instructorData.instructorNo || "";
 
-  const phoneElement = document.getElementById("displayPhone");
+	const phoneElement = document.getElementById("displayPhone");
 
-  const cacheKey = "confirmationPhone_" + instructorNo;
+	const cacheKey = "confirmationPhone_" + instructorNo;
 
-  const cachedPhone = sessionStorage.getItem(cacheKey);
+	const cachedPhone = sessionStorage.getItem(cacheKey);
 
-  // ----------------------------------------------------------
-  // 이미 이번 세션에서 연락처 인증 완료
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 이미 이번 세션에서 연락처 인증 완료
+	// ----------------------------------------------------------
 
-  if (cachedPhone) {
-    confirmationPhone = cachedPhone;
+	if (cachedPhone) {
+		confirmationPhone = cachedPhone;
 
-    if (phoneElement) {
-      phoneElement.textContent = instructorData.phone || "-";
-    }
+		if (phoneElement) {
+			phoneElement.textContent = instructorData.phone || "-";
+		}
 
-    const verificationArea = document.getElementById("phoneVerificationArea");
+		const verificationArea = document.getElementById("phoneVerificationArea");
 
-    if (verificationArea) {
-      verificationArea.style.display = "none";
-    }
+		if (verificationArea) {
+			verificationArea.style.display = "none";
+		}
 
-    loadConfirmation(name, confirmationPhone).catch(function (error) {
-      console.error("저장된 연락처로 강사확인서 조회 오류:", error);
+		loadConfirmation(name, confirmationPhone).catch(function (error) {
+			console.error("저장된 연락처로 강사확인서 조회 오류:", error);
 
-      /*
-       * 이미 제출된 상태에서 조회에 실패하더라도
-       * 여기서 연락처 캐시를 바로 삭제하지 않음.
-       *
-       * 제출 상태 확인은 이미 앞 단계에서 끝났기 때문.
-       */
-    });
+			/*
+			 * 이미 제출된 상태에서 조회에 실패하더라도
+			 * 여기서 연락처 캐시를 바로 삭제하지 않음.
+			 *
+			 * 제출 상태 확인은 이미 앞 단계에서 끝났기 때문.
+			 */
+		});
 
-    return;
-  }
+		return;
+	}
 
-  // ----------------------------------------------------------
-  // 연락처 미인증 → 입력창 표시
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 연락처 미인증 → 입력창 표시
+	// ----------------------------------------------------------
 
-  const verificationArea = document.getElementById("phoneVerificationArea");
+	const verificationArea = document.getElementById("phoneVerificationArea");
 
-  if (verificationArea) {
-    verificationArea.style.display = "block";
-  }
+	if (verificationArea) {
+		verificationArea.style.display = "block";
+	}
 
-  showMessage("연락처 뒤 8자리를 입력해주세요.", "loading");
+	showMessage("연락처 뒤 8자리를 입력해주세요.", "loading");
 
-  const phoneInput = document.getElementById("confirmationPhoneInput");
+	const phoneInput = document.getElementById("confirmationPhoneInput");
 
-  if (phoneInput) {
-    phoneInput.value = "";
+	if (phoneInput) {
+		phoneInput.value = "";
 
-    phoneInput.focus();
+		phoneInput.focus();
 
-    if (!phoneInput.dataset.enterBound) {
-      phoneInput.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
+		if (!phoneInput.dataset.enterBound) {
+			phoneInput.addEventListener("keydown", function (event) {
+				if (event.key === "Enter") {
+					event.preventDefault();
 
-          verifyConfirmationPhone();
-        }
-      });
+					verifyConfirmationPhone();
+				}
+			});
 
-      phoneInput.dataset.enterBound = "true";
-    }
-  }
+			phoneInput.dataset.enterBound = "true";
+		}
+	}
 }
 /* ============================================================
    연락처 본인확인
    ============================================================ */
 
 async function verifyConfirmationPhone() {
-  if (!instructorData) {
-    showVerificationPrompt();
-    return;
-  }
+	if (!instructorData) {
+		showVerificationPrompt();
+		return;
+	}
 
-  const input = document.getElementById("confirmationPhoneInput");
+	const input = document.getElementById("confirmationPhoneInput");
 
-  const button = document.getElementById("phoneVerifyButton");
+	const button = document.getElementById("phoneVerifyButton");
 
-  if (!input) {
-    return;
-  }
+	if (!input) {
+		return;
+	}
 
-  const phone = input.value.replace(/\D/g, "");
+	const phone = input.value.replace(/\D/g, "");
 
-  if (!phone) {
-    showMessage("연락처 뒤 8자리를 입력해주세요.", "error");
-    input.focus();
-    return;
-  }
+	if (!phone) {
+		showMessage("연락처 뒤 8자리를 입력해주세요.", "error");
+		input.focus();
+		return;
+	}
 
-  if (phone.length !== 8) {
-    showMessage("연락처 뒤 8자리를 정확하게 입력해주세요.", "error");
-    input.focus();
-    return;
-  }
+	if (phone.length !== 8) {
+		showMessage("연락처 뒤 8자리를 정확하게 입력해주세요.", "error");
+		input.focus();
+		return;
+	}
 
-  if (button) {
-    button.disabled = true;
-    button.textContent = "확인 중...";
-  }
+	if (button) {
+		button.disabled = true;
+		button.textContent = "확인 중...";
+	}
 
-  try {
-    const name = instructorData.instructorName || "";
+	try {
+		const name = instructorData.instructorName || "";
 
-    /* --------------------------------------------------------
+		/* --------------------------------------------------------
        기존 강사확인서 조회
        -------------------------------------------------------- */
 
-    await loadConfirmation(name, phone);
+		await loadConfirmation(name, phone);
 
-    /* --------------------------------------------------------
+		/* --------------------------------------------------------
        조회 성공했을 때만 연락처 저장
        -------------------------------------------------------- */
 
-    confirmationPhone = phone;
+		confirmationPhone = phone;
 
-    const instructorNo = instructorData.instructorNo || "";
+		const instructorNo = instructorData.instructorNo || "";
 
-    sessionStorage.setItem(
-      "confirmationPhone_" + instructorNo,
-      confirmationPhone,
-    );
+		sessionStorage.setItem(
+			"confirmationPhone_" + instructorNo,
+			confirmationPhone,
+		);
 
-    const displayPhone = document.getElementById("displayPhone");
+		const displayPhone = document.getElementById("displayPhone");
 
-    if (displayPhone) {
-      displayPhone.textContent = instructorData.phone || "-";
-    }
+		if (displayPhone) {
+			displayPhone.textContent = instructorData.phone || "-";
+		}
 
-    const verificationArea = document.getElementById("phoneVerificationArea");
+		const verificationArea = document.getElementById("phoneVerificationArea");
 
-    if (verificationArea) {
-      verificationArea.style.display = "none";
-    }
-  } catch (error) {
-    /*
-     * loadConfirmation에서 이미 오류 메시지를 표시하므로
-     * 여기서는 추가 처리만 하지 않음.
-     */
+		if (verificationArea) {
+			verificationArea.style.display = "none";
+		}
+	} catch (error) {
+		/*
+		 * loadConfirmation에서 이미 오류 메시지를 표시하므로
+		 * 여기서는 추가 처리만 하지 않음.
+		 */
 
-    console.error("강사확인서 본인확인 오류:", error);
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = "확인";
-    }
-  }
+		console.error("강사확인서 본인확인 오류:", error);
+	} finally {
+		if (button) {
+			button.disabled = false;
+			button.textContent = "확인";
+		}
+	}
 }
 
 /* ============================================================
@@ -372,11 +372,11 @@ async function verifyConfirmationPhone() {
    ============================================================ */
 
 function showVerificationPrompt() {
-  showMessage("본인인증 정보가 만료되었습니다. 다시 조회해주세요.", "error");
+	showMessage("본인인증 정보가 만료되었습니다. 다시 조회해주세요.", "error");
 
-  setTimeout(function () {
-    window.location.href = "index.html";
-  }, 1500);
+	setTimeout(function () {
+		window.location.href = "index.html";
+	}, 1500);
 }
 
 /* ============================================================
@@ -384,19 +384,19 @@ function showVerificationPrompt() {
    ============================================================ */
 
 function normalizeRole(role) {
-  if (!role) return "";
+	if (!role) return "";
 
-  const value = String(role).trim();
+	const value = String(role).trim();
 
-  if (value === "주강사" || value === "주") {
-    return "주강사";
-  }
+	if (value === "주강사" || value === "주") {
+		return "주강사";
+	}
 
-  if (value === "보조강사" || value === "보조") {
-    return "보조강사";
-  }
+	if (value === "보조강사" || value === "보조") {
+		return "보조강사";
+	}
 
-  return value;
+	return value;
 }
 
 /* ============================================================
@@ -405,60 +405,60 @@ function normalizeRole(role) {
    ============================================================ */
 
 async function loadConfirmation(name, phone) {
-  showMessage("강사확인서를 불러오는 중입니다.", "loading");
+	showMessage("강사확인서를 불러오는 중입니다.", "loading");
 
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
+	try {
+		const response = await fetch(API_URL, {
+			method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+			headers: {
+				"Content-Type": "application/json",
+			},
 
-      body: JSON.stringify({
-        action: "searchInstructorData",
-        name: name,
-        phone: phone,
-      }),
-    });
+			body: JSON.stringify({
+				action: "searchInstructorData",
+				name: name,
+				phone: phone,
+			}),
+		});
 
-    if (!response.ok) {
-      throw new Error("서버 응답 오류 (" + response.status + ")");
-    }
+		if (!response.ok) {
+			throw new Error("서버 응답 오류 (" + response.status + ")");
+		}
 
-    const data = await response.json();
+		const data = await response.json();
 
-    console.log("강사확인서 조회 결과:", data);
+		console.log("강사확인서 조회 결과:", data);
 
-    if (!data.success) {
-      throw new Error(data.message || "강사확인서 정보를 불러오지 못했습니다.");
-    }
+		if (!data.success) {
+			throw new Error(data.message || "강사확인서 정보를 불러오지 못했습니다.");
+		}
 
-    /*
-     * searchInstructorData의 기존 응답 구조 그대로 사용
-     */
-    currentMonth = data.month || currentMonth;
+		/*
+		 * searchInstructorData의 기존 응답 구조 그대로 사용
+		 */
+		currentMonth = data.month || currentMonth;
 
-    renderConfirmation(data);
+		renderConfirmation(data);
 
-    const confirmationArea = document.getElementById("confirmationArea");
+		const confirmationArea = document.getElementById("confirmationArea");
 
-    if (confirmationArea) {
-      confirmationArea.style.display = "block";
-    }
+		if (confirmationArea) {
+			confirmationArea.style.display = "block";
+		}
 
-    hideMessage();
+		hideMessage();
 
-    initCanvas();
+		initCanvas();
 
-    return data;
-  } catch (error) {
-    console.error("강사확인서 조회 오류:", error);
+		return data;
+	} catch (error) {
+		console.error("강사확인서 조회 오류:", error);
 
-    showMessage(error.message || "강사확인서를 불러오지 못했습니다.", "error");
+		showMessage(error.message || "강사확인서를 불러오지 못했습니다.", "error");
 
-    throw error;
-  }
+		throw error;
+	}
 }
 
 /* ============================================================
@@ -473,69 +473,69 @@ async function loadConfirmation(name, phone) {
    ============================================================ */
 
 function renderConfirmation(res) {
-  const confirmationDocument = document.getElementById("confirmationDocument");
+	const confirmationDocument = document.getElementById("confirmationDocument");
 
-  if (!confirmationDocument) {
-    throw new Error("강사확인서 영역을 찾을 수 없습니다.");
-  }
+	if (!confirmationDocument) {
+		throw new Error("강사확인서 영역을 찾을 수 없습니다.");
+	}
 
-  const name = res.name || instructorData.instructorName || "";
+	const name = res.name || instructorData.instructorName || "";
 
-  const phone = res.phone || instructorData.phone || confirmationPhone || "";
+	const phone = res.phone || instructorData.phone || confirmationPhone || "";
 
-  const role = res.role || instructorData.role || "";
+	const role = res.role || instructorData.role || "";
 
-  const summary = res.summary || {};
+	const summary = res.summary || {};
 
-  const mainData = Array.isArray(res.mainData) ? res.mainData : [];
+	const mainData = Array.isArray(res.mainData) ? res.mainData : [];
 
-  const subData = Array.isArray(res.subData) ? res.subData : [];
+	const subData = Array.isArray(res.subData) ? res.subData : [];
 
-  // ----------------------------------------------------------
-  // 상단 강사정보
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 상단 강사정보
+	// ----------------------------------------------------------
 
-  const displayPhone = document.getElementById("displayPhone");
+	const displayPhone = document.getElementById("displayPhone");
 
-  if (displayPhone) {
-    displayPhone.textContent = formatPhoneNumber(phone);
-  }
+	if (displayPhone) {
+		displayPhone.textContent = formatPhoneNumber(phone);
+	}
 
-  const displayRole = document.getElementById("displayRole");
+	const displayRole = document.getElementById("displayRole");
 
-  if (displayRole) {
-    displayRole.textContent = normalizeRole(role);
-  }
+	if (displayRole) {
+		displayRole.textContent = normalizeRole(role);
+	}
 
-  const displayMonth = document.getElementById("displayMonth");
+	const displayMonth = document.getElementById("displayMonth");
 
-  if (displayMonth) {
-    displayMonth.textContent = res.month
-      ? `${res.month}월 강사확인서`
-      : "강사확인서";
-  }
+	if (displayMonth) {
+		displayMonth.textContent = res.month
+			? `${res.month}월 강사확인서`
+			: "강사확인서";
+	}
 
-  // ----------------------------------------------------------
-  // 합계
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 합계
+	// ----------------------------------------------------------
 
-  const mainHours = Number(summary.mainHours || 0);
+	const mainHours = Number(summary.mainHours || 0);
 
-  const mainPay = Number(summary.mainPay || 0);
+	const mainPay = Number(summary.mainPay || 0);
 
-  const subHours = Number(summary.subHours || 0);
+	const subHours = Number(summary.subHours || 0);
 
-  const subOtherPay = Number(summary.subOtherPay || 0);
+	const subOtherPay = Number(summary.subOtherPay || 0);
 
-  const subPay = Number(summary.subPay || 0);
+	const subPay = Number(summary.subPay || 0);
 
-  const grandTotal = Number(summary.grandTotal || 0);
+	const grandTotal = Number(summary.grandTotal || 0);
 
-  // ----------------------------------------------------------
-  // 강사확인서 HTML
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 강사확인서 HTML
+	// ----------------------------------------------------------
 
-  let html = `
+	let html = `
     <div class="sheet-box" id="confirmation-card">
 
       <div
@@ -630,12 +630,12 @@ function renderConfirmation(res) {
         </tr>
   `;
 
-  // ----------------------------------------------------------
-  // 주강사
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 주강사
+	// ----------------------------------------------------------
 
-  if (mainData.length === 0) {
-    html += `
+	if (mainData.length === 0) {
+		html += `
       <tr>
         <td
           colspan="4"
@@ -644,9 +644,9 @@ function renderConfirmation(res) {
         </td>
       </tr>
     `;
-  } else {
-    mainData.forEach(function (item) {
-      html += `
+	} else {
+		mainData.forEach(function (item) {
+			html += `
         <tr>
     <td class="date-cell">
       <div class="cell-inner">${escapeHtml(item.colB || "")}</div>
@@ -665,9 +665,9 @@ function renderConfirmation(res) {
     </td>
   </tr>
       `;
-    });
+		});
 
-    html += `
+		html += `
       <tr
         style="
           background-color: #f3f4f6;
@@ -687,9 +687,9 @@ function renderConfirmation(res) {
         </td>
       </tr>
     `;
-  }
+	}
 
-  html += `
+	html += `
       </table>
 
       <div class="section-title">
@@ -715,12 +715,12 @@ function renderConfirmation(res) {
         </tr>
   `;
 
-  // ----------------------------------------------------------
-  // 보조강사
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 보조강사
+	// ----------------------------------------------------------
 
-  if (subData.length === 0) {
-    html += `
+	if (subData.length === 0) {
+		html += `
       <tr>
         <td
           colspan="5"
@@ -729,9 +729,9 @@ function renderConfirmation(res) {
         </td>
       </tr>
     `;
-  } else {
-    subData.forEach(function (item) {
-      html += `
+	} else {
+		subData.forEach(function (item) {
+			html += `
         <tr>
        <td class="date-cell">
         <div class="cell-inner">${escapeHtml(item.colB || "")}</div>
@@ -750,9 +750,9 @@ function renderConfirmation(res) {
       </td>
     </tr>
       `;
-    });
+		});
 
-    html += `
+		html += `
       <tr
         style="
           background-color: #f3f4f6;
@@ -776,13 +776,13 @@ function renderConfirmation(res) {
         </td>
       </tr>
     `;
-  }
+	}
 
-  // ----------------------------------------------------------
-  // 서명
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 서명
+	// ----------------------------------------------------------
 
-  html += `
+	html += `
       </table>
 
       <div class="signature-area pdf-avoid-break">
@@ -834,21 +834,21 @@ function renderConfirmation(res) {
     </div>
   `;
 
-  // ----------------------------------------------------------
-  // 확인서 본문 반영
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 확인서 본문 반영
+	// ----------------------------------------------------------
 
-  confirmationDocument.innerHTML = html;
+	confirmationDocument.innerHTML = html;
 
-  // ----------------------------------------------------------
-  // 제출 버튼 상태
-  // ----------------------------------------------------------
+	// ----------------------------------------------------------
+	// 제출 버튼 상태
+	// ----------------------------------------------------------
 
-  const actionArea = document.getElementById("submit-action-area");
+	const actionArea = document.getElementById("submit-action-area");
 
-  if (actionArea) {
-    if (res.alreadySubmitted) {
-      actionArea.innerHTML = `
+	if (actionArea) {
+		if (res.alreadySubmitted) {
+			actionArea.innerHTML = `
         <div
           style="
             display: flex;
@@ -866,8 +866,8 @@ function renderConfirmation(res) {
           </button>
         </div>
       `;
-    } else {
-      actionArea.innerHTML = `
+		} else {
+			actionArea.innerHTML = `
         <button
           type="button"
           id="submitButton"
@@ -877,8 +877,8 @@ function renderConfirmation(res) {
           서명 후 제출
         </button>
       `;
-    }
-  }
+		}
+	}
 }
 
 /* ============================================================
@@ -886,32 +886,32 @@ function renderConfirmation(res) {
    ============================================================ */
 
 function initCanvas() {
-  canvas = document.getElementById("sig-canvas");
+	canvas = document.getElementById("sig-canvas");
 
-  if (!canvas) return;
+	if (!canvas) return;
 
-  ctx = canvas.getContext("2d");
+	ctx = canvas.getContext("2d");
 
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
+	ctx.strokeStyle = "#000000";
+	ctx.lineWidth = 2;
+	ctx.lineCap = "round";
+	ctx.lineJoin = "round";
 
-  canvas.addEventListener("mousedown", startDrawing);
+	canvas.addEventListener("mousedown", startDrawing);
 
-  canvas.addEventListener("mousemove", draw);
+	canvas.addEventListener("mousemove", draw);
 
-  canvas.addEventListener("mouseup", stopDrawing);
+	canvas.addEventListener("mouseup", stopDrawing);
 
-  canvas.addEventListener("mouseleave", stopDrawing);
+	canvas.addEventListener("mouseleave", stopDrawing);
 
-  canvas.addEventListener("touchstart", startDrawing, { passive: false });
+	canvas.addEventListener("touchstart", startDrawing, { passive: false });
 
-  canvas.addEventListener("touchmove", draw, { passive: false });
+	canvas.addEventListener("touchmove", draw, { passive: false });
 
-  canvas.addEventListener("touchend", stopDrawing, { passive: false });
+	canvas.addEventListener("touchend", stopDrawing, { passive: false });
 
-  canvas.addEventListener("touchcancel", stopDrawing, { passive: false });
+	canvas.addEventListener("touchcancel", stopDrawing, { passive: false });
 }
 
 /* ============================================================
@@ -919,15 +919,15 @@ function initCanvas() {
    ============================================================ */
 
 function startDrawing(event) {
-  event.preventDefault();
+	event.preventDefault();
 
-  drawing = true;
+	drawing = true;
 
-  const point = getCanvasPoint(event);
+	const point = getCanvasPoint(event);
 
-  ctx.beginPath();
+	ctx.beginPath();
 
-  ctx.moveTo(point.x, point.y);
+	ctx.moveTo(point.x, point.y);
 }
 
 /* ============================================================
@@ -935,15 +935,15 @@ function startDrawing(event) {
    ============================================================ */
 
 function draw(event) {
-  if (!drawing) return;
+	if (!drawing) return;
 
-  event.preventDefault();
+	event.preventDefault();
 
-  const point = getCanvasPoint(event);
+	const point = getCanvasPoint(event);
 
-  ctx.lineTo(point.x, point.y);
+	ctx.lineTo(point.x, point.y);
 
-  ctx.stroke();
+	ctx.stroke();
 }
 
 /* ============================================================
@@ -951,15 +951,15 @@ function draw(event) {
    ============================================================ */
 
 function stopDrawing(event) {
-  if (event) {
-    event.preventDefault();
-  }
+	if (event) {
+		event.preventDefault();
+	}
 
-  drawing = false;
+	drawing = false;
 
-  if (ctx) {
-    ctx.closePath();
-  }
+	if (ctx) {
+		ctx.closePath();
+	}
 }
 
 /* ============================================================
@@ -967,30 +967,30 @@ function stopDrawing(event) {
    ============================================================ */
 
 function getCanvasPoint(event) {
-  const rect = canvas.getBoundingClientRect();
+	const rect = canvas.getBoundingClientRect();
 
-  let clientX;
-  let clientY;
+	let clientX;
+	let clientY;
 
-  if (event.touches && event.touches.length) {
-    clientX = event.touches[0].clientX;
+	if (event.touches && event.touches.length) {
+		clientX = event.touches[0].clientX;
 
-    clientY = event.touches[0].clientY;
-  } else if (event.changedTouches && event.changedTouches.length) {
-    clientX = event.changedTouches[0].clientX;
+		clientY = event.touches[0].clientY;
+	} else if (event.changedTouches && event.changedTouches.length) {
+		clientX = event.changedTouches[0].clientX;
 
-    clientY = event.changedTouches[0].clientY;
-  } else {
-    clientX = event.clientX;
+		clientY = event.changedTouches[0].clientY;
+	} else {
+		clientX = event.clientX;
 
-    clientY = event.clientY;
-  }
+		clientY = event.clientY;
+	}
 
-  return {
-    x: (clientX - rect.left) * (canvas.width / rect.width),
+	return {
+		x: (clientX - rect.left) * (canvas.width / rect.width),
 
-    y: (clientY - rect.top) * (canvas.height / rect.height),
-  };
+		y: (clientY - rect.top) * (canvas.height / rect.height),
+	};
 }
 
 /* ============================================================
@@ -998,11 +998,11 @@ function getCanvasPoint(event) {
    ============================================================ */
 
 function clearCanvas() {
-  if (!canvas || !ctx) return;
+	if (!canvas || !ctx) return;
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  drawing = false;
+	drawing = false;
 }
 
 /* ============================================================
@@ -1010,13 +1010,13 @@ function clearCanvas() {
    ============================================================ */
 
 function isCanvasBlank(canvas) {
-  const blank = document.createElement("canvas");
+	const blank = document.createElement("canvas");
 
-  blank.width = canvas.width;
+	blank.width = canvas.width;
 
-  blank.height = canvas.height;
+	blank.height = canvas.height;
 
-  return canvas.toDataURL() === blank.toDataURL();
+	return canvas.toDataURL() === blank.toDataURL();
 }
 
 /* ============================================================
@@ -1025,85 +1025,85 @@ function isCanvasBlank(canvas) {
    ============================================================ */
 
 async function submitSignature() {
-  if (!canvas) {
-    alert("서명 영역을 불러오지 못했습니다.");
+	if (!canvas) {
+		alert("서명 영역을 불러오지 못했습니다.");
 
-    return;
-  }
+		return;
+	}
 
-  if (isCanvasBlank(canvas)) {
-    alert("서명을 먼저 입력해주세요.");
+	if (isCanvasBlank(canvas)) {
+		alert("서명을 먼저 입력해주세요.");
 
-    return;
-  }
+		return;
+	}
 
-  const button = document.getElementById("submitButton");
+	const button = document.getElementById("submitButton");
 
-  if (button) {
-    if (button.disabled) {
-      return;
-    }
+	if (button) {
+		if (button.disabled) {
+			return;
+		}
 
-    button.disabled = true;
+		button.disabled = true;
 
-    button.textContent = "PDF 생성 중...";
-  }
+		button.textContent = "PDF 생성 중...";
+	}
 
-  try {
-    /* --------------------------------------------------------
+	try {
+		/* --------------------------------------------------------
        강사 정보
        -------------------------------------------------------- */
 
-    const name =
-      instructorData && instructorData.instructorName
-        ? instructorData.instructorName
-        : "";
+		const name =
+			instructorData && instructorData.instructorName
+				? instructorData.instructorName
+				: "";
 
-    let phone = confirmationPhone || "";
+		let phone = confirmationPhone || "";
 
-    if (!phone && instructorData && instructorData.instructorNo) {
-      phone =
-        sessionStorage.getItem(
-          "confirmationPhone_" + instructorData.instructorNo,
-        ) || "";
-    }
+		if (!phone && instructorData && instructorData.instructorNo) {
+			phone =
+				sessionStorage.getItem(
+					"confirmationPhone_" + instructorData.instructorNo,
+				) || "";
+		}
 
-    if (!name) {
-      throw new Error("강사 정보를 확인할 수 없습니다.");
-    }
+		if (!name) {
+			throw new Error("강사 정보를 확인할 수 없습니다.");
+		}
 
-    if (!phone) {
-      throw new Error("연락처 본인확인이 필요합니다.");
-    }
+		if (!phone) {
+			throw new Error("연락처 본인확인이 필요합니다.");
+		}
 
-    const mVal = currentMonth || "";
+		const mVal = currentMonth || "";
 
-    /* --------------------------------------------------------
+		/* --------------------------------------------------------
        PDF 안의 강사명 / 연락처
        -------------------------------------------------------- */
 
-    const elName = document.getElementById("pdf-instructor-name");
+		const elName = document.getElementById("pdf-instructor-name");
 
-    const elPhone = document.getElementById("pdf-instructor-phone");
+		const elPhone = document.getElementById("pdf-instructor-phone");
 
-    if (elName) {
-      elName.innerText = name || "-";
-    }
+		if (elName) {
+			elName.innerText = name || "-";
+		}
 
-    if (elPhone) {
-      elPhone.innerText = formatPhoneNumber(phone) || "-";
-    }
+		if (elPhone) {
+			elPhone.innerText = formatPhoneNumber(phone) || "-";
+		}
 
-    /* --------------------------------------------------------
+		/* --------------------------------------------------------
        서명 이미지를 화면에 고정
        -------------------------------------------------------- */
 
-    const signatureArea = document.querySelector(".signature-area");
+		const signatureArea = document.querySelector(".signature-area");
 
-    if (signatureArea) {
-      const signatureImgData = canvas.toDataURL("image/png");
+		if (signatureArea) {
+			const signatureImgData = canvas.toDataURL("image/png");
 
-      signatureArea.innerHTML = `
+			signatureArea.innerHTML = `
         <div
           class="signature-title"
           style="
@@ -1129,72 +1129,72 @@ async function submitSignature() {
 
         </div>
       `;
-    }
+		}
 
-    if (button) {
-      button.textContent = "PDF 생성 중...";
-    }
+		if (button) {
+			button.textContent = "PDF 생성 중...";
+		}
 
-    /* --------------------------------------------------------
+		/* --------------------------------------------------------
        서버 저장용 PDF 생성
        -------------------------------------------------------- */
 
-    const pdfBase64 = await generateCustomPDF(name);
+		const pdfBase64 = await generateCustomPDF(name);
 
-    if (button) {
-      button.textContent = "저장 중...";
-    }
+		if (button) {
+			button.textContent = "저장 중...";
+		}
 
-    /* --------------------------------------------------------
+		/* --------------------------------------------------------
        기존 saveSignaturePDF 호출
        -------------------------------------------------------- */
 
-    const response = await fetch(API_URL, {
-      method: "POST",
+		const response = await fetch(API_URL, {
+			method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-      },
+			headers: {
+				"Content-Type": "application/json",
+			},
 
-      body: JSON.stringify({
-        action: "saveSignaturePDF",
+			body: JSON.stringify({
+				action: "saveSignaturePDF",
 
-        name: name,
+				name: name,
 
-        phone: phone,
+				phone: phone,
 
-        month: mVal,
+				month: mVal,
 
-        pdfData: pdfBase64,
-      }),
-    });
+				pdfData: pdfBase64,
+			}),
+		});
 
-    if (!response.ok) {
-      throw new Error("저장 서버 응답 오류 (" + response.status + ")");
-    }
+		if (!response.ok) {
+			throw new Error("저장 서버 응답 오류 (" + response.status + ")");
+		}
 
-    const result = await response.json();
+		const result = await response.json();
 
-    console.log("서명 저장 결과:", result);
+		console.log("서명 저장 결과:", result);
 
-    if (!result.success) {
-      throw new Error(result.message || "강사확인서 저장에 실패했습니다.");
-    }
+		if (!result.success) {
+			throw new Error(result.message || "강사확인서 저장에 실패했습니다.");
+		}
 
-    // --------------------------------------------------------
-    // 제출 완료
-    // --------------------------------------------------------
-    alert("강사확인서가 제출되었습니다.");
+		// --------------------------------------------------------
+		// 제출 완료
+		// --------------------------------------------------------
+		alert("강사확인서가 제출되었습니다.");
 
-    let actionArea = document.getElementById("submit-action-area");
+		let actionArea = document.getElementById("submit-action-area");
 
-    // 혹시 HTML에 ID가 빠져 있어도 기존 .action-area를 찾음
-    if (!actionArea) {
-      actionArea = document.querySelector(".action-area");
-    }
+		// 혹시 HTML에 ID가 빠져 있어도 기존 .action-area를 찾음
+		if (!actionArea) {
+			actionArea = document.querySelector(".action-area");
+		}
 
-    if (actionArea) {
-      actionArea.innerHTML = `
+		if (actionArea) {
+			actionArea.innerHTML = `
     <div
       style="
         display: flex;
@@ -1214,18 +1214,18 @@ async function submitSignature() {
 
     </div>
   `;
-    }
-  } catch (error) {
-    console.error("서명 제출 오류:", error);
+		}
+	} catch (error) {
+		console.error("서명 제출 오류:", error);
 
-    alert(error.message || "강사확인서 제출 중 오류가 발생했습니다.");
+		alert(error.message || "강사확인서 제출 중 오류가 발생했습니다.");
 
-    if (button) {
-      button.disabled = false;
+		if (button) {
+			button.disabled = false;
 
-      button.textContent = "서명 후 제출";
-    }
-  }
+			button.textContent = "서명 후 제출";
+		}
+	}
 }
 
 /* ============================================================
@@ -1234,141 +1234,141 @@ async function submitSignature() {
    ============================================================ */
 
 function generateCustomPDF(name) {
-  return new Promise(function (resolve, reject) {
-    const originalElement = document.getElementById("confirmation-card");
+	return new Promise(function (resolve, reject) {
+		const originalElement = document.getElementById("confirmation-card");
 
-    if (!originalElement) {
-      reject(new Error("확인서 영역을 찾을 수 없습니다."));
+		if (!originalElement) {
+			reject(new Error("확인서 영역을 찾을 수 없습니다."));
 
-      return;
-    }
+			return;
+		}
 
-    /* ------------------------------------------------------
+		/* ------------------------------------------------------
          복사본 생성
          ------------------------------------------------------ */
 
-    const clonedElement = originalElement.cloneNode(true);
+		const clonedElement = originalElement.cloneNode(true);
 
-    /* ------------------------------------------------------
+		/* ------------------------------------------------------
          복사본 스타일
          ------------------------------------------------------ */
 
-    clonedElement.style.width = "790px";
+		clonedElement.style.width = "790px";
 
-    clonedElement.style.height = "auto";
+		clonedElement.style.height = "auto";
 
-    clonedElement.style.maxHeight = "none";
+		clonedElement.style.maxHeight = "none";
 
-    clonedElement.style.overflow = "visible";
+		clonedElement.style.overflow = "visible";
 
-    clonedElement.style.position = "relative";
+		clonedElement.style.position = "relative";
 
-    clonedElement.style.display = "block";
+		clonedElement.style.display = "block";
 
-    clonedElement.style.background = "#ffffff";
+		clonedElement.style.background = "#ffffff";
 
-    /* 기존 80% 축소 유지 */
+		/* 기존 80% 축소 유지 */
 
-    clonedElement.style.transform = "scale(0.8)";
+		clonedElement.style.transform = "scale(0.8)";
 
-    clonedElement.style.transformOrigin = "top center";
+		clonedElement.style.transformOrigin = "top center";
 
-    /* ------------------------------------------------------
+		/* ------------------------------------------------------
          내부 테이블 스타일
          ------------------------------------------------------ */
 
-    const tables = clonedElement.querySelectorAll("table");
+		const tables = clonedElement.querySelectorAll("table");
 
-    tables.forEach(function (table) {
-      table.style.width = "100%";
+		tables.forEach(function (table) {
+			table.style.width = "100%";
 
-      table.style.height = "auto";
+			table.style.height = "auto";
 
-      table.style.tableLayout = "auto";
+			table.style.tableLayout = "auto";
 
-      table.style.borderCollapse = "collapse";
-    });
+			table.style.borderCollapse = "collapse";
+		});
 
-    /* ------------------------------------------------------
+		/* ------------------------------------------------------
          일시 셀 줄바꿈 유지
          ------------------------------------------------------ */
 
-    const dateCells = clonedElement.querySelectorAll(
-      ".data-table td:first-child",
-    );
+		const dateCells = clonedElement.querySelectorAll(
+			".data-table td:first-child",
+		);
 
-    dateCells.forEach(function (cell) {
-      cell.style.whiteSpace = "pre-line";
-    });
+		dateCells.forEach(function (cell) {
+			cell.style.whiteSpace = "pre-line";
+		});
 
-    /* ------------------------------------------------------
+		/* ------------------------------------------------------
          PDF 옵션
          ------------------------------------------------------ */
 
-    const opt = {
-      margin: [10, 0, 0, 0],
+		const opt = {
+			margin: [10, 0, 0, 0],
 
-      filename: "temp.pdf",
+			filename: "temp.pdf",
 
-      pagebreak: {
-        mode: ["css", "legacy"],
-      },
+			pagebreak: {
+				mode: ["css", "legacy"],
+			},
 
-      html2canvas: {
-        scale: 2,
+			html2canvas: {
+				scale: 2,
 
-        scrollY: 0,
+				scrollY: 0,
 
-        scrollX: 0,
+				scrollX: 0,
 
-        useCORS: true,
+				useCORS: true,
 
-        dpi: 300,
+				dpi: 300,
 
-        windowHeight: Math.floor(clonedElement.scrollHeight * 0.8),
+				windowHeight: Math.floor(clonedElement.scrollHeight * 0.8),
 
-        letterRendering: true,
+				letterRendering: true,
 
-        allowTaint: false,
-      },
+				allowTaint: false,
+			},
 
-      image: {
-        type: "jpeg",
-        quality: 0.98,
-      },
+			image: {
+				type: "jpeg",
+				quality: 0.98,
+			},
 
-      jsPDF: {
-        unit: "mm",
-        format: "a4",
-        orientation: "portrait",
-      },
-    };
+			jsPDF: {
+				unit: "mm",
+				format: "a4",
+				orientation: "portrait",
+			},
+		};
 
-    /* ------------------------------------------------------
+		/* ------------------------------------------------------
          PDF 생성
          ------------------------------------------------------ */
 
-    html2pdf()
-      .from(clonedElement)
+		html2pdf()
+			.from(clonedElement)
 
-      .set(opt)
+			.set(opt)
 
-      .toPdf()
+			.toPdf()
 
-      .get("pdf")
+			.get("pdf")
 
-      .then(function (pdf) {
-        return pdf.output("datauristring");
-      })
+			.then(function (pdf) {
+				return pdf.output("datauristring");
+			})
 
-      .then(function (pdfBase64) {
-        resolve(pdfBase64);
-      })
+			.then(function (pdfBase64) {
+				resolve(pdfBase64);
+			})
 
-      .catch(function (error) {
-        reject(error);
-      });
-  });
+			.catch(function (error) {
+				reject(error);
+			});
+	});
 }
 
 /* ============================================================
@@ -1376,159 +1376,159 @@ function generateCustomPDF(name) {
    ============================================================ */
 
 function downloadPDF() {
-  const originalElement = document.getElementById("confirmation-card");
+	const originalElement = document.getElementById("confirmation-card");
 
-  if (!originalElement) {
-    alert("확인서 영역을 찾을 수 없습니다.");
+	if (!originalElement) {
+		alert("확인서 영역을 찾을 수 없습니다.");
 
-    return;
-  }
+		return;
+	}
 
-  const nameVal =
-    instructorData && instructorData.instructorName
-      ? instructorData.instructorName
-      : "확인서";
+	const nameVal =
+		instructorData && instructorData.instructorName
+			? instructorData.instructorName
+			: "확인서";
 
-  let phoneVal = confirmationPhone || "";
+	let phoneVal = confirmationPhone || "";
 
-  if (!phoneVal && instructorData && instructorData.instructorNo) {
-    phoneVal =
-      sessionStorage.getItem(
-        "confirmationPhone_" + instructorData.instructorNo,
-      ) || "";
-  }
+	if (!phoneVal && instructorData && instructorData.instructorNo) {
+		phoneVal =
+			sessionStorage.getItem(
+				"confirmationPhone_" + instructorData.instructorNo,
+			) || "";
+	}
 
-  const elName = document.getElementById("pdf-instructor-name");
+	const elName = document.getElementById("pdf-instructor-name");
 
-  const elPhone = document.getElementById("pdf-instructor-phone");
+	const elPhone = document.getElementById("pdf-instructor-phone");
 
-  if (elName) {
-    elName.innerText = nameVal || "-";
-  }
+	if (elName) {
+		elName.innerText = nameVal || "-";
+	}
 
-  if (elPhone) {
-    elPhone.innerText = formatPhoneNumber(phoneVal) || "-";
-  }
+	if (elPhone) {
+		elPhone.innerText = formatPhoneNumber(phoneVal) || "-";
+	}
 
-  const mVal = currentMonth ? currentMonth + "월_" : "";
+	const mVal = currentMonth ? currentMonth + "월_" : "";
 
-  const filename = mVal + "강사확인서_" + (nameVal || "확인서") + ".pdf";
+	const filename = mVal + "강사확인서_" + (nameVal || "확인서") + ".pdf";
 
-  /* ----------------------------------------------------------
+	/* ----------------------------------------------------------
      복사본 생성
      ---------------------------------------------------------- */
 
-  const clonedElement = originalElement.cloneNode(true);
+	const clonedElement = originalElement.cloneNode(true);
 
-  /* ----------------------------------------------------------
+	/* ----------------------------------------------------------
      스타일 적용
      ---------------------------------------------------------- */
 
-  clonedElement.style.width = "790px";
+	clonedElement.style.width = "790px";
 
-  clonedElement.style.height = "auto";
+	clonedElement.style.height = "auto";
 
-  clonedElement.style.maxHeight = "none";
+	clonedElement.style.maxHeight = "none";
 
-  clonedElement.style.overflow = "visible";
+	clonedElement.style.overflow = "visible";
 
-  clonedElement.style.position = "relative";
+	clonedElement.style.position = "relative";
 
-  clonedElement.style.display = "block";
+	clonedElement.style.display = "block";
 
-  clonedElement.style.background = "#ffffff";
+	clonedElement.style.background = "#ffffff";
 
-  clonedElement.style.transform = "scale(0.8)";
+	clonedElement.style.transform = "scale(0.8)";
 
-  clonedElement.style.transformOrigin = "top center";
+	clonedElement.style.transformOrigin = "top center";
 
-  /* ----------------------------------------------------------
+	/* ----------------------------------------------------------
      테이블 스타일
      ---------------------------------------------------------- */
 
-  const tables = clonedElement.querySelectorAll("table");
+	const tables = clonedElement.querySelectorAll("table");
 
-  tables.forEach(function (table) {
-    table.style.width = "100%";
+	tables.forEach(function (table) {
+		table.style.width = "100%";
 
-    table.style.height = "auto";
+		table.style.height = "auto";
 
-    table.style.tableLayout = "auto";
+		table.style.tableLayout = "auto";
 
-    table.style.borderCollapse = "collapse";
-  });
+		table.style.borderCollapse = "collapse";
+	});
 
-  /* ----------------------------------------------------------
+	/* ----------------------------------------------------------
      일시 셀 줄바꿈
      ---------------------------------------------------------- */
 
-  const dateCells = clonedElement.querySelectorAll(
-    ".data-table td:first-child",
-  );
+	const dateCells = clonedElement.querySelectorAll(
+		".data-table td:first-child",
+	);
 
-  dateCells.forEach(function (cell) {
-    cell.style.whiteSpace = "pre-line";
-  });
+	dateCells.forEach(function (cell) {
+		cell.style.whiteSpace = "pre-line";
+	});
 
-  /* ----------------------------------------------------------
+	/* ----------------------------------------------------------
      PDF 옵션
      ---------------------------------------------------------- */
 
-  const opt = {
-    margin: [10, 0, 0, 0],
+	const opt = {
+		margin: [10, 0, 0, 0],
 
-    filename: filename,
+		filename: filename,
 
-    pagebreak: {
-      mode: ["css", "legacy"],
-    },
+		pagebreak: {
+			mode: ["css", "legacy"],
+		},
 
-    html2canvas: {
-      scale: 2,
+		html2canvas: {
+			scale: 2,
 
-      scrollY: 0,
+			scrollY: 0,
 
-      scrollX: 0,
+			scrollX: 0,
 
-      useCORS: true,
+			useCORS: true,
 
-      dpi: 300,
+			dpi: 300,
 
-      windowHeight: Math.floor(clonedElement.scrollHeight * 0.8),
+			windowHeight: Math.floor(clonedElement.scrollHeight * 0.8),
 
-      letterRendering: true,
+			letterRendering: true,
 
-      allowTaint: false,
-    },
+			allowTaint: false,
+		},
 
-    image: {
-      type: "jpeg",
-      quality: 0.98,
-    },
+		image: {
+			type: "jpeg",
+			quality: 0.98,
+		},
 
-    jsPDF: {
-      unit: "mm",
-      format: "a4",
-      orientation: "portrait",
-    },
-  };
+		jsPDF: {
+			unit: "mm",
+			format: "a4",
+			orientation: "portrait",
+		},
+	};
 
-  alert("PDF 파일 다운로드를 시작합니다.");
+	alert("PDF 파일 다운로드를 시작합니다.");
 
-  html2pdf()
-    .from(clonedElement)
+	html2pdf()
+		.from(clonedElement)
 
-    .set(opt)
+		.set(opt)
 
-    .toPdf()
+		.toPdf()
 
-    .save(filename)
+		.save(filename)
 
-    .catch(function (error) {
-      console.error("PDF 다운로드 오류:", error);
+		.catch(function (error) {
+			console.error("PDF 다운로드 오류:", error);
 
-      alert("다운로드 중 오류가 발생했습니다.");
-    });
+			alert("다운로드 중 오류가 발생했습니다.");
+		});
 }
 
 /* ============================================================
@@ -1536,23 +1536,23 @@ function downloadPDF() {
    ============================================================ */
 
 function formatDate(value) {
-  if (!value) {
-    return "";
-  }
+	if (!value) {
+		return "";
+	}
 
-  const date = new Date(value);
+	const date = new Date(value);
 
-  if (isNaN(date.getTime())) {
-    return String(value);
-  }
+	if (isNaN(date.getTime())) {
+		return String(value);
+	}
 
-  const year = date.getFullYear();
+	const year = date.getFullYear();
 
-  const month = String(date.getMonth() + 1).padStart(2, "0");
+	const month = String(date.getMonth() + 1).padStart(2, "0");
 
-  const day = String(date.getDate()).padStart(2, "0");
+	const day = String(date.getDate()).padStart(2, "0");
 
-  return `${year}.${month}.${day}`;
+	return `${year}.${month}.${day}`;
 }
 
 /* ============================================================
@@ -1560,19 +1560,19 @@ function formatDate(value) {
    ============================================================ */
 
 function formatMoney(value) {
-  if (value === null || value === undefined || value === "") {
-    return "0원";
-  }
+	if (value === null || value === undefined || value === "") {
+		return "0원";
+	}
 
-  const number = Number(
-    String(value).replace(/,/g, "").replace(/원/g, "").trim(),
-  );
+	const number = Number(
+		String(value).replace(/,/g, "").replace(/원/g, "").trim(),
+	);
 
-  if (isNaN(number)) {
-    return String(value);
-  }
+	if (isNaN(number)) {
+		return String(value);
+	}
 
-  return number.toLocaleString("ko-KR") + "원";
+	return number.toLocaleString("ko-KR") + "원";
 }
 
 /* ============================================================
@@ -1580,17 +1580,17 @@ function formatMoney(value) {
    ============================================================ */
 
 function formatPhoneNumber(value) {
-  const digits = String(value || "").replace(/\D/g, "");
+	const digits = String(value || "").replace(/\D/g, "");
 
-  if (digits.length === 11) {
-    return digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
-  }
+	if (digits.length === 11) {
+		return digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
+	}
 
-  if (digits.length === 10) {
-    return digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
-  }
+	if (digits.length === 10) {
+		return digits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+	}
 
-  return value || "";
+	return value || "";
 }
 
 /* ============================================================
@@ -1598,16 +1598,16 @@ function formatPhoneNumber(value) {
    ============================================================ */
 
 function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
+	return String(value ?? "")
+		.replace(/&/g, "&amp;")
 
-    .replace(/</g, "&lt;")
+		.replace(/</g, "&lt;")
 
-    .replace(/>/g, "&gt;")
+		.replace(/>/g, "&gt;")
 
-    .replace(/"/g, "&quot;")
+		.replace(/"/g, "&quot;")
 
-    .replace(/'/g, "&#039;");
+		.replace(/'/g, "&#039;");
 }
 
 /* ============================================================
@@ -1615,15 +1615,15 @@ function escapeHtml(value) {
    ============================================================ */
 
 function showMessage(text, type) {
-  const message = document.getElementById("message");
+	const message = document.getElementById("message");
 
-  if (!message) {
-    return;
-  }
+	if (!message) {
+		return;
+	}
 
-  message.textContent = text;
+	message.textContent = text;
 
-  message.className = "message show " + type;
+	message.className = "message show " + type;
 }
 
 /* ============================================================
@@ -1631,13 +1631,13 @@ function showMessage(text, type) {
    ============================================================ */
 
 function hideMessage() {
-  const message = document.getElementById("message");
+	const message = document.getElementById("message");
 
-  if (!message) {
-    return;
-  }
+	if (!message) {
+		return;
+	}
 
-  message.textContent = "";
+	message.textContent = "";
 
-  message.className = "message";
+	message.className = "message";
 }

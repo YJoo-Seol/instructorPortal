@@ -28,7 +28,7 @@ const ADMIN_CACHE_KEY = "adminDashboardCache";
 // ==========================================================
 
 document.addEventListener("DOMContentLoaded", function () {
-  initAdminAuth();
+	initAdminAuth();
 });
 
 // ==========================================================
@@ -36,54 +36,54 @@ document.addEventListener("DOMContentLoaded", function () {
 // ==========================================================
 
 function initAdminAuth() {
-  const authenticated = sessionStorage.getItem(ADMIN_AUTH_KEY);
+	const authenticated = sessionStorage.getItem(ADMIN_AUTH_KEY);
 
-  if (authenticated === "true") {
-    showAdminDashboard();
+	if (authenticated === "true") {
+		showAdminDashboard();
 
-    return;
-  }
+		return;
+	}
 
-  showAdminLogin();
+	showAdminLogin();
 }
 // ==========================================================
 // 운영진 로그인 화면 표시
 // ==========================================================
 
 function showAdminLogin() {
-  const loginScreen = document.getElementById("adminVerificationArea");
+	const loginScreen = document.getElementById("adminVerificationArea");
 
-  const dashboard = document.getElementById("adminDashboardArea");
+	const dashboard = document.getElementById("adminDashboardArea");
 
-  if (loginScreen) {
-    loginScreen.style.display = "block";
-  }
+	if (loginScreen) {
+		loginScreen.style.display = "block";
+	}
 
-  if (dashboard) {
-    dashboard.style.display = "none";
-  }
+	if (dashboard) {
+		dashboard.style.display = "none";
+	}
 }
 // ==========================================================
 // 운영진 대시보드 표시
 // ==========================================================
 
 function showAdminDashboard() {
-  const loginScreen = document.getElementById("adminVerificationArea");
+	const loginScreen = document.getElementById("adminVerificationArea");
 
-  const dashboard = document.getElementById("adminDashboardArea");
+	const dashboard = document.getElementById("adminDashboardArea");
 
-  if (loginScreen) {
-    loginScreen.style.display = "none";
-  }
+	if (loginScreen) {
+		loginScreen.style.display = "none";
+	}
 
-  if (dashboard) {
-    dashboard.style.display = "block";
-  }
+	if (dashboard) {
+		dashboard.style.display = "block";
+	}
 
-  resetToToday();
+	resetToToday();
 
-  // 운영진 화면 자동 갱신 시작
-  startAdminAutoRefresh();
+	// 운영진 화면 자동 갱신 시작
+	startAdminAutoRefresh();
 }
 
 // ==========================================================
@@ -91,90 +91,90 @@ function showAdminDashboard() {
 // ==========================================================
 
 async function verifyAdminAccess() {
-  const input = document.getElementById("adminAuthInput");
+	const input = document.getElementById("adminAuthInput");
 
-  if (!input) {
-    console.error("adminAuthInput 요소를 찾을 수 없습니다.");
+	if (!input) {
+		console.error("adminAuthInput 요소를 찾을 수 없습니다.");
 
-    return;
-  }
+		return;
+	}
 
-  const authCode = String(input.value || "").trim();
+	const authCode = String(input.value || "").trim();
 
-  if (!authCode) {
-    alert("운영진 확인번호를 입력해주세요.");
+	if (!authCode) {
+		alert("운영진 확인번호를 입력해주세요.");
 
-    input.focus();
+		input.focus();
 
-    return;
-  }
+		return;
+	}
 
-  // 숫자만 허용
-  if (!/^\d{8}$/.test(authCode)) {
-    alert("운영진 확인번호 8자리를 입력해주세요.");
+	// 숫자만 허용
+	if (!/^\d{8}$/.test(authCode)) {
+		alert("운영진 확인번호 8자리를 입력해주세요.");
 
-    input.focus();
+		input.focus();
 
-    return;
-  }
+		return;
+	}
 
-  const button = document.getElementById("adminVerifyButton");
+	const button = document.getElementById("adminVerifyButton");
 
-  if (button) {
-    button.disabled = true;
+	if (button) {
+		button.disabled = true;
 
-    button.textContent = "확인 중...";
-  }
+		button.textContent = "확인 중...";
+	}
 
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
+	try {
+		const response = await fetch(API_URL, {
+			method: "POST",
 
-      headers: {
-        "Content-Type": "text/plain;charset=UTF-8",
-      },
+			headers: {
+				"Content-Type": "text/plain;charset=UTF-8",
+			},
 
-      body: JSON.stringify({
-        action: "adminLogin",
+			body: JSON.stringify({
+				action: "adminLogin",
 
-        authCode: authCode,
-      }),
-    });
+				authCode: authCode,
+			}),
+		});
 
-    const result = await response.json();
+		const result = await response.json();
 
-    console.log("[운영진 인증 결과]", result);
+		console.log("[운영진 인증 결과]", result);
 
-    if (!response.ok || !result.success) {
-      throw new Error(
-        result && result.message
-          ? result.message
-          : "운영진 확인번호가 올바르지 않습니다.",
-      );
-    }
+		if (!response.ok || !result.success) {
+			throw new Error(
+				result && result.message
+					? result.message
+					: "운영진 확인번호가 올바르지 않습니다.",
+			);
+		}
 
-    // ======================================================
-    // 인증 성공
-    // ======================================================
+		// ======================================================
+		// 인증 성공
+		// ======================================================
 
-    sessionStorage.setItem(ADMIN_AUTH_KEY, "true");
+		sessionStorage.setItem(ADMIN_AUTH_KEY, "true");
 
-    if (input) {
-      input.value = "";
-    }
+		if (input) {
+			input.value = "";
+		}
+		setupWebPush();
+		showAdminDashboard();
+	} catch (error) {
+		console.error("운영진 인증 오류:", error);
 
-    showAdminDashboard();
-  } catch (error) {
-    console.error("운영진 인증 오류:", error);
+		alert(error.message || "운영진 인증에 실패했습니다.");
+	} finally {
+		if (button) {
+			button.disabled = false;
 
-    alert(error.message || "운영진 인증에 실패했습니다.");
-  } finally {
-    if (button) {
-      button.disabled = false;
-
-      button.textContent = "확인";
-    }
-  }
+			button.textContent = "확인";
+		}
+	}
 }
 
 // ==========================================================
@@ -182,11 +182,11 @@ async function verifyAdminAccess() {
 // ==========================================================
 
 function handleAdminAuthKeydown(event) {
-  if (event.key === "Enter") {
-    event.preventDefault();
+	if (event.key === "Enter") {
+		event.preventDefault();
 
-    verifyAdminAccess();
-  }
+		verifyAdminAccess();
+	}
 }
 
 // ==========================================================
@@ -194,33 +194,33 @@ function handleAdminAuthKeydown(event) {
 // ==========================================================
 
 function logoutAdmin() {
-  stopAdminAutoRefresh();
+	stopAdminAutoRefresh();
 
-  sessionStorage.removeItem(ADMIN_AUTH_KEY);
-  sessionStorage.removeItem(ADMIN_CACHE_KEY);
+	sessionStorage.removeItem(ADMIN_AUTH_KEY);
+	sessionStorage.removeItem(ADMIN_CACHE_KEY);
 
-  allAdminSchedules = [];
-  showAdminLogin();
+	allAdminSchedules = [];
+	showAdminLogin();
 }
 // ============================================================
 // 운영진 대시보드 캐시 저장
 // ============================================================
 
 function saveAdminDashboardCache() {
-  try {
-    const weekKey = getAdminWeekKey(selectedAdminDate);
+	try {
+		const weekKey = getAdminWeekKey(selectedAdminDate);
 
-    sessionStorage.setItem(
-      ADMIN_CACHE_KEY,
-      JSON.stringify({
-        schedules: allAdminSchedules || [],
-        weekKey: weekKey,
-        savedAt: Date.now(),
-      }),
-    );
-  } catch (e) {
-    console.warn("운영진 대시보드 캐시 저장 실패:", e);
-  }
+		sessionStorage.setItem(
+			ADMIN_CACHE_KEY,
+			JSON.stringify({
+				schedules: allAdminSchedules || [],
+				weekKey: weekKey,
+				savedAt: Date.now(),
+			}),
+		);
+	} catch (e) {
+		console.warn("운영진 대시보드 캐시 저장 실패:", e);
+	}
 }
 
 // ============================================================
@@ -228,34 +228,34 @@ function saveAdminDashboardCache() {
 // ============================================================
 
 function loadAdminDashboardCache() {
-  try {
-    const cached = sessionStorage.getItem(ADMIN_CACHE_KEY);
+	try {
+		const cached = sessionStorage.getItem(ADMIN_CACHE_KEY);
 
-    if (!cached) {
-      return false;
-    }
+		if (!cached) {
+			return false;
+		}
 
-    const data = JSON.parse(cached);
+		const data = JSON.parse(cached);
 
-    if (!data || !Array.isArray(data.schedules)) {
-      return false;
-    }
+		if (!data || !Array.isArray(data.schedules)) {
+			return false;
+		}
 
-    // 현재 선택된 날짜의 주간 데이터인지 확인
-    const currentWeekKey = getAdminWeekKey(selectedAdminDate);
+		// 현재 선택된 날짜의 주간 데이터인지 확인
+		const currentWeekKey = getAdminWeekKey(selectedAdminDate);
 
-    if (data.weekKey && data.weekKey !== currentWeekKey) {
-      return false;
-    }
+		if (data.weekKey && data.weekKey !== currentWeekKey) {
+			return false;
+		}
 
-    allAdminSchedules = data.schedules;
+		allAdminSchedules = data.schedules;
 
-    return true;
-  } catch (e) {
-    console.warn("운영진 대시보드 캐시 불러오기 실패:", e);
+		return true;
+	} catch (e) {
+		console.warn("운영진 대시보드 캐시 불러오기 실패:", e);
 
-    return false;
-  }
+		return false;
+	}
 }
 
 // ==========================================================
@@ -266,149 +266,149 @@ function loadAdminDashboardCache() {
 // ==========================================================
 
 async function loadAdminData() {
-  if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "true") {
-    showAdminLogin();
+	if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "true") {
+		showAdminLogin();
 
-    return;
-  }
-  try {
-    // --------------------------------------------------------
-    // 현재 선택 날짜
-    // --------------------------------------------------------
+		return;
+	}
+	try {
+		// --------------------------------------------------------
+		// 현재 선택 날짜
+		// --------------------------------------------------------
 
-    const year = selectedAdminDate.getFullYear();
+		const year = selectedAdminDate.getFullYear();
 
-    const month = String(selectedAdminDate.getMonth() + 1).padStart(2, "0");
+		const month = String(selectedAdminDate.getMonth() + 1).padStart(2, "0");
 
-    const day = String(selectedAdminDate.getDate()).padStart(2, "0");
+		const day = String(selectedAdminDate.getDate()).padStart(2, "0");
 
-    const targetDate = `${year}-${month}-${day}`;
+		const targetDate = `${year}-${month}-${day}`;
 
-    // --------------------------------------------------------
-    // 1. 캐시 먼저 확인
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 1. 캐시 먼저 확인
+		// --------------------------------------------------------
 
-    const hasCache = loadAdminDashboardCache();
+		const hasCache = loadAdminDashboardCache();
 
-    // --------------------------------------------------------
-    // 2. 캐시가 있으면 즉시 화면 표시
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 2. 캐시가 있으면 즉시 화면 표시
+		// --------------------------------------------------------
 
-    if (hasCache) {
-      console.log("[운영진 대시보드] 캐시 즉시 표시");
+		if (hasCache) {
+			console.log("[운영진 대시보드] 캐시 즉시 표시");
 
-      renderFilteredAdminSchedules();
-    } else {
-      // 캐시가 없을 때만 로딩 표시
+			renderFilteredAdminSchedules();
+		} else {
+			// 캐시가 없을 때만 로딩 표시
 
-      const list = document.getElementById("adminList");
+			const list = document.getElementById("adminList");
 
-      if (list) {
-        list.innerHTML = `
+			if (list) {
+				list.innerHTML = `
           <div class="loading-message">
             일정을 불러오는 중입니다.
           </div>
         `;
-      }
-    }
+			}
+		}
 
-    // --------------------------------------------------------
-    // 3. 최신 데이터 조회
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 3. 최신 데이터 조회
+		// --------------------------------------------------------
 
-    console.log("[운영진 대시보드] 최신 데이터 조회:", targetDate);
+		console.log("[운영진 대시보드] 최신 데이터 조회:", targetDate);
 
-    const response = await fetch(API_URL, {
-      method: "POST",
+		const response = await fetch(API_URL, {
+			method: "POST",
 
-      headers: {
-        "Content-Type": "text/plain;charset=UTF-8",
-      },
+			headers: {
+				"Content-Type": "text/plain;charset=UTF-8",
+			},
 
-      body: JSON.stringify({
-        action: "getAdminSchedules",
-        date: targetDate,
-      }),
-    });
+			body: JSON.stringify({
+				action: "getAdminSchedules",
+				date: targetDate,
+			}),
+		});
 
-    // --------------------------------------------------------
-    // 4. HTTP 확인
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 4. HTTP 확인
+		// --------------------------------------------------------
 
-    if (!response.ok) {
-      throw new Error("HTTP 오류: " + response.status);
-    }
+		if (!response.ok) {
+			throw new Error("HTTP 오류: " + response.status);
+		}
 
-    // --------------------------------------------------------
-    // 5. JSON 변환
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 5. JSON 변환
+		// --------------------------------------------------------
 
-    const result = await response.json();
+		const result = await response.json();
 
-    // --------------------------------------------------------
-    // 6. 서버 결과 확인
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 6. 서버 결과 확인
+		// --------------------------------------------------------
 
-    if (!result || result.success === false) {
-      throw new Error(
-        result && result.message
-          ? result.message
-          : "운영진 일정 조회에 실패했습니다.",
-      );
-    }
+		if (!result || result.success === false) {
+			throw new Error(
+				result && result.message
+					? result.message
+					: "운영진 일정 조회에 실패했습니다.",
+			);
+		}
 
-    // --------------------------------------------------------
-    // 7. 최신 일정 반영
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 7. 최신 일정 반영
+		// --------------------------------------------------------
 
-    allAdminSchedules = Array.isArray(result.schedules) ? result.schedules : [];
+		allAdminSchedules = Array.isArray(result.schedules) ? result.schedules : [];
 
-    // --------------------------------------------------------
-    // 8. 캐시 갱신
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 8. 캐시 갱신
+		// --------------------------------------------------------
 
-    saveAdminDashboardCache();
+		saveAdminDashboardCache();
 
-    // --------------------------------------------------------
-    // 9. 최신 화면 반영
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 9. 최신 화면 반영
+		// --------------------------------------------------------
 
-    renderFilteredAdminSchedules();
+		renderFilteredAdminSchedules();
 
-    console.log(
-      "[운영진 대시보드] 최신 데이터 갱신 완료:",
-      allAdminSchedules.length,
-    );
-  } catch (error) {
-    console.error("운영진 대시보드 조회 오류:", error);
+		console.log(
+			"[운영진 대시보드] 최신 데이터 갱신 완료:",
+			allAdminSchedules.length,
+		);
+	} catch (error) {
+		console.error("운영진 대시보드 조회 오류:", error);
 
-    // --------------------------------------------------------
-    // 캐시가 있으면 기존 화면 유지
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 캐시가 있으면 기존 화면 유지
+		// --------------------------------------------------------
 
-    if (Array.isArray(allAdminSchedules) && allAdminSchedules.length > 0) {
-      console.warn("[운영진 대시보드] 최신 조회 실패 → 기존 데이터 유지");
+		if (Array.isArray(allAdminSchedules) && allAdminSchedules.length > 0) {
+			console.warn("[운영진 대시보드] 최신 조회 실패 → 기존 데이터 유지");
 
-      renderFilteredAdminSchedules();
+			renderFilteredAdminSchedules();
 
-      return;
-    }
+			return;
+		}
 
-    // --------------------------------------------------------
-    // 캐시도 없을 때만 오류 표시
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 캐시도 없을 때만 오류 표시
+		// --------------------------------------------------------
 
-    const list = document.getElementById("adminList");
+		const list = document.getElementById("adminList");
 
-    if (list) {
-      list.innerHTML = `
+		if (list) {
+			list.innerHTML = `
         <div class="error-message">
           일정을 불러오지 못했습니다.<br>
           잠시 후 다시 시도해주세요.
         </div>
       `;
-    }
-  }
+		}
+	}
 }
 
 // ==========================================================
@@ -419,31 +419,31 @@ async function loadAdminData() {
 // ==========================================================
 
 function renderFilteredAdminSchedules() {
-  const year = selectedAdminDate.getFullYear();
+	const year = selectedAdminDate.getFullYear();
 
-  const month = String(selectedAdminDate.getMonth() + 1).padStart(2, "0");
+	const month = String(selectedAdminDate.getMonth() + 1).padStart(2, "0");
 
-  const day = String(selectedAdminDate.getDate()).padStart(2, "0");
+	const day = String(selectedAdminDate.getDate()).padStart(2, "0");
 
-  const targetKey = `${year}-${month}-${day}`;
+	const targetKey = `${year}-${month}-${day}`;
 
-  const filteredSchedules = allAdminSchedules.filter(function (schedule) {
-    if (!schedule) {
-      return false;
-    }
+	const filteredSchedules = allAdminSchedules.filter(function (schedule) {
+		if (!schedule) {
+			return false;
+		}
 
-    const scheduleDate = String(schedule.date || "").trim();
+		const scheduleDate = String(schedule.date || "").trim();
 
-    return scheduleDate === targetKey;
-  });
+		return scheduleDate === targetKey;
+	});
 
-  console.log("[운영진 날짜 필터]", {
-    선택날짜: targetKey,
-    전체주간일정: allAdminSchedules.length,
-    해당날짜: filteredSchedules.length,
-  });
+	console.log("[운영진 날짜 필터]", {
+		선택날짜: targetKey,
+		전체주간일정: allAdminSchedules.length,
+		해당날짜: filteredSchedules.length,
+	});
 
-  renderAdminData(filteredSchedules);
+	renderAdminData(filteredSchedules);
 }
 
 // ==========================================================
@@ -451,55 +451,55 @@ function renderFilteredAdminSchedules() {
 // ==========================================================
 
 function updateAdminDateDisplay() {
-  const display = document.getElementById("dateNavDisplay");
+	const display = document.getElementById("dateNavDisplay");
 
-  const rangeDisplay = document.getElementById("dateNavRange");
+	const rangeDisplay = document.getElementById("dateNavRange");
 
-  if (!display) {
-    return;
-  }
+	if (!display) {
+		return;
+	}
 
-  const year = selectedAdminDate.getFullYear();
+	const year = selectedAdminDate.getFullYear();
 
-  const month = selectedAdminDate.getMonth() + 1;
+	const month = selectedAdminDate.getMonth() + 1;
 
-  const day = selectedAdminDate.getDate();
+	const day = selectedAdminDate.getDate();
 
-  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+	const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 
-  const weekday = weekdays[selectedAdminDate.getDay()];
+	const weekday = weekdays[selectedAdminDate.getDay()];
 
-  display.textContent = `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")} (${weekday})`;
+	display.textContent = `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")} (${weekday})`;
 
-  // --------------------------------------------------------
-  // 선택 날짜 ~ 해당 주 일요일
-  // --------------------------------------------------------
+	// --------------------------------------------------------
+	// 선택 날짜 ~ 해당 주 일요일
+	// --------------------------------------------------------
 
-  if (rangeDisplay) {
-    const current = new Date(selectedAdminDate);
+	if (rangeDisplay) {
+		const current = new Date(selectedAdminDate);
 
-    current.setHours(0, 0, 0, 0);
+		current.setHours(0, 0, 0, 0);
 
-    const dayOfWeek = current.getDay();
+		const dayOfWeek = current.getDay();
 
-    const sunday = new Date(current);
+		const sunday = new Date(current);
 
-    sunday.setDate(current.getDate() + (dayOfWeek === 0 ? 0 : 7 - dayOfWeek));
+		sunday.setDate(current.getDate() + (dayOfWeek === 0 ? 0 : 7 - dayOfWeek));
 
-    const sundayMonth = sunday.getMonth() + 1;
+		const sundayMonth = sunday.getMonth() + 1;
 
-    const sundayDay = sunday.getDate();
+		const sundayDay = sunday.getDate();
 
-    const sundayWeekday = weekdays[sunday.getDay()];
+		const sundayWeekday = weekdays[sunday.getDay()];
 
-    const currentMonth = current.getMonth() + 1;
+		const currentMonth = current.getMonth() + 1;
 
-    const currentDay = current.getDate();
+		const currentDay = current.getDate();
 
-    const currentWeekday = weekdays[current.getDay()];
+		const currentWeekday = weekdays[current.getDay()];
 
-    rangeDisplay.textContent = `${currentMonth}월 ${currentDay}일(${currentWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(${sundayWeekday})까지 조회 가능`;
-  }
+		rangeDisplay.textContent = `${currentMonth}월 ${currentDay}일(${currentWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(${sundayWeekday})까지 조회 가능`;
+	}
 }
 
 // ==========================================================
@@ -507,45 +507,45 @@ function updateAdminDateDisplay() {
 // ==========================================================
 
 function moveDate(offset) {
-  const oldDate = new Date(selectedAdminDate);
+	const oldDate = new Date(selectedAdminDate);
 
-  const newDate = new Date(selectedAdminDate);
+	const newDate = new Date(selectedAdminDate);
 
-  newDate.setDate(newDate.getDate() + offset);
+	newDate.setDate(newDate.getDate() + offset);
 
-  newDate.setHours(0, 0, 0, 0);
+	newDate.setHours(0, 0, 0, 0);
 
-  selectedAdminDate = newDate;
+	selectedAdminDate = newDate;
 
-  updateAdminDateDisplay();
+	updateAdminDateDisplay();
 
-  // ========================================================
-  // 기존 날짜와 새 날짜가 같은 주인지 확인
-  // ========================================================
+	// ========================================================
+	// 기존 날짜와 새 날짜가 같은 주인지 확인
+	// ========================================================
 
-  const oldWeek = getAdminWeekKey(oldDate);
+	const oldWeek = getAdminWeekKey(oldDate);
 
-  const newWeek = getAdminWeekKey(newDate);
+	const newWeek = getAdminWeekKey(newDate);
 
-  // ========================================================
-  // 같은 주
-  // → 서버 요청 없이 기존 데이터에서 필터링
-  // ========================================================
+	// ========================================================
+	// 같은 주
+	// → 서버 요청 없이 기존 데이터에서 필터링
+	// ========================================================
 
-  if (oldWeek === newWeek) {
-    renderFilteredAdminSchedules();
+	if (oldWeek === newWeek) {
+		renderFilteredAdminSchedules();
 
-    return;
-  }
+		return;
+	}
 
-  // ========================================================
-  // 다른 주
-  // → 새로운 주간 데이터 조회
-  // ========================================================
+	// ========================================================
+	// 다른 주
+	// → 새로운 주간 데이터 조회
+	// ========================================================
 
-  console.log("[운영진 날짜 이동] 주간 범위 변경 → 새 주 조회");
+	console.log("[운영진 날짜 이동] 주간 범위 변경 → 새 주 조회");
 
-  loadAdminData();
+	loadAdminData();
 }
 
 // ==========================================================
@@ -553,24 +553,24 @@ function moveDate(offset) {
 // ==========================================================
 
 function resetToToday() {
-  const today = new Date();
+	const today = new Date();
 
-  today.setHours(0, 0, 0, 0);
+	today.setHours(0, 0, 0, 0);
 
-  selectedAdminDate = today;
+	selectedAdminDate = today;
 
-  updateAdminDateDisplay();
+	updateAdminDateDisplay();
 
-  // 현재 저장된 주간 데이터가 있으면
-  // 서버 재조회 없이 날짜만 필터링
-  if (Array.isArray(allAdminSchedules) && allAdminSchedules.length > 0) {
-    renderFilteredAdminSchedules();
+	// 현재 저장된 주간 데이터가 있으면
+	// 서버 재조회 없이 날짜만 필터링
+	if (Array.isArray(allAdminSchedules) && allAdminSchedules.length > 0) {
+		renderFilteredAdminSchedules();
 
-    return;
-  }
+		return;
+	}
 
-  // 최초 페이지 로딩
-  loadAdminData();
+	// 최초 페이지 로딩
+	loadAdminData();
 }
 
 // ==========================================================
@@ -581,14 +581,14 @@ function resetToToday() {
 // setToday()를 호출하고 있어도 동작하도록 유지
 
 function setToday() {
-  resetToToday();
+	resetToToday();
 }
 
 // 기존 HTML 또는 다른 코드에서
 // changeDate()를 호출하고 있어도 동작하도록 유지
 
 function changeDate(offset) {
-  moveDate(offset);
+	moveDate(offset);
 }
 
 // ==========================================================
@@ -596,23 +596,23 @@ function changeDate(offset) {
 // ==========================================================
 
 function updateSummary(total, complete, incomplete) {
-  const totalElement = document.getElementById("totalCount");
+	const totalElement = document.getElementById("totalCount");
 
-  const completeElement = document.getElementById("completeCount");
+	const completeElement = document.getElementById("completeCount");
 
-  const incompleteElement = document.getElementById("incompleteCount");
+	const incompleteElement = document.getElementById("incompleteCount");
 
-  if (totalElement) {
-    totalElement.textContent = total;
-  }
+	if (totalElement) {
+		totalElement.textContent = total;
+	}
 
-  if (completeElement) {
-    completeElement.textContent = complete;
-  }
+	if (completeElement) {
+		completeElement.textContent = complete;
+	}
 
-  if (incompleteElement) {
-    incompleteElement.textContent = incomplete;
-  }
+	if (incompleteElement) {
+		incompleteElement.textContent = incomplete;
+	}
 }
 
 // ==========================================================
@@ -620,17 +620,17 @@ function updateSummary(total, complete, incomplete) {
 // ==========================================================
 
 function showLoading() {
-  const loading = document.getElementById("loadingMessage");
+	const loading = document.getElementById("loadingMessage");
 
-  if (loading) {
-    loading.style.display = "block";
-  }
+	if (loading) {
+		loading.style.display = "block";
+	}
 
-  const list = document.getElementById("adminList");
+	const list = document.getElementById("adminList");
 
-  if (list) {
-    list.innerHTML = "";
-  }
+	if (list) {
+		list.innerHTML = "";
+	}
 }
 
 // ==========================================================
@@ -638,11 +638,11 @@ function showLoading() {
 // ==========================================================
 
 function hideLoading() {
-  const loading = document.getElementById("loadingMessage");
+	const loading = document.getElementById("loadingMessage");
 
-  if (loading) {
-    loading.style.display = "none";
-  }
+	if (loading) {
+		loading.style.display = "none";
+	}
 }
 
 // ==========================================================
@@ -650,23 +650,23 @@ function hideLoading() {
 // ==========================================================
 
 function showError(message) {
-  const error = document.getElementById("errorMessage");
+	const error = document.getElementById("errorMessage");
 
-  if (!error) {
-    return;
-  }
+	if (!error) {
+		return;
+	}
 
-  error.textContent = message;
+	error.textContent = message;
 
-  error.style.display = "block";
+	error.style.display = "block";
 }
 
 function hideError() {
-  const error = document.getElementById("errorMessage");
+	const error = document.getElementById("errorMessage");
 
-  if (error) {
-    error.style.display = "none";
-  }
+	if (error) {
+		error.style.display = "none";
+	}
 }
 
 // ==========================================================
@@ -674,62 +674,62 @@ function hideError() {
 // ==========================================================
 
 function renderAdminData(schedules) {
-  const list = document.getElementById("adminList");
+	const list = document.getElementById("adminList");
 
-  if (!list) {
-    return;
-  }
+	if (!list) {
+		return;
+	}
 
-  list.innerHTML = "";
+	list.innerHTML = "";
 
-  schedules = Array.isArray(schedules) ? schedules : [];
+	schedules = Array.isArray(schedules) ? schedules : [];
 
-  let completeCount = 0;
-  let incompleteCount = 0;
+	let completeCount = 0;
+	let incompleteCount = 0;
 
-  schedules.forEach(function (schedule) {
-    const card = createScheduleCard(schedule);
+	schedules.forEach(function (schedule) {
+		const card = createScheduleCard(schedule);
 
-    if (card) {
-      list.appendChild(card);
-    }
+		if (card) {
+			list.appendChild(card);
+		}
 
-    // --------------------------------------------------------
-    // 주강사 종료보고
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 주강사 종료보고
+		// --------------------------------------------------------
 
-    const mainComplete = schedule.mainTeacher
-      ? schedule.mainEndReport === true
-      : true;
+		const mainComplete = schedule.mainTeacher
+			? schedule.mainEndReport === true
+			: true;
 
-    // --------------------------------------------------------
-    // 보조강사 시작 + 종료보고
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 보조강사 시작 + 종료보고
+		// --------------------------------------------------------
 
-    const assistantComplete =
-      schedule.assistantStartReport === true &&
-      schedule.assistantEndReport === true;
+		const assistantComplete =
+			schedule.assistantStartReport === true &&
+			schedule.assistantEndReport === true;
 
-    // --------------------------------------------------------
-    // 전체 완료 여부
-    // --------------------------------------------------------
+		// --------------------------------------------------------
+		// 전체 완료 여부
+		// --------------------------------------------------------
 
-    const isComplete = mainComplete && assistantComplete;
+		const isComplete = mainComplete && assistantComplete;
 
-    if (isComplete) {
-      completeCount++;
-    } else {
-      incompleteCount++;
-    }
-  });
+		if (isComplete) {
+			completeCount++;
+		} else {
+			incompleteCount++;
+		}
+	});
 
-  updateSummary(schedules.length, completeCount, incompleteCount);
+	updateSummary(schedules.length, completeCount, incompleteCount);
 
-  const emptyMessage = document.getElementById("emptyMessage");
+	const emptyMessage = document.getElementById("emptyMessage");
 
-  if (emptyMessage) {
-    emptyMessage.style.display = schedules.length === 0 ? "block" : "none";
-  }
+	if (emptyMessage) {
+		emptyMessage.style.display = schedules.length === 0 ? "block" : "none";
+	}
 }
 
 // ==========================================================
@@ -737,114 +737,114 @@ function renderAdminData(schedules) {
 // ==========================================================
 
 function createScheduleCard(schedule) {
-  if (!schedule) {
-    return null;
-  }
+	if (!schedule) {
+		return null;
+	}
 
-  const card = document.createElement("div");
-  card.className = "dispatch-card";
+	const card = document.createElement("div");
+	card.className = "dispatch-card";
 
-  // ========================================================
-  // 기본 정보
-  // ========================================================
+	// ========================================================
+	// 기본 정보
+	// ========================================================
 
-  const facilityName = escapeHtml(schedule.facilityName || "-");
+	const facilityName = escapeHtml(schedule.facilityName || "-");
 
-  const startTime = String(schedule.startTime || schedule.time || "").trim();
+	const startTime = String(schedule.startTime || schedule.time || "").trim();
 
-  const endTime = String(schedule.endTime || "").trim();
+	const endTime = String(schedule.endTime || "").trim();
 
-  let timeText = "-";
+	let timeText = "-";
 
-  if (startTime && endTime) {
-    timeText = startTime + "~" + endTime;
-  } else if (startTime) {
-    timeText = startTime;
-  }
+	if (startTime && endTime) {
+		timeText = startTime + "~" + endTime;
+	} else if (startTime) {
+		timeText = startTime;
+	}
 
-  const time = escapeHtml(timeText);
+	const time = escapeHtml(timeText);
 
-  const target = escapeHtml(schedule.target || "-");
+	const target = escapeHtml(schedule.target || "-");
 
-  // ========================================================
-  // 강사
-  // ========================================================
+	// ========================================================
+	// 강사
+	// ========================================================
 
-  const mainTeacher = getInstructorName(schedule.mainTeacher);
+	const mainTeacher = getInstructorName(schedule.mainTeacher);
 
-  const assistantTeacher = getInstructorName(schedule.assistantTeacher);
+	const assistantTeacher = getInstructorName(schedule.assistantTeacher);
 
-  const assistantIsOperations = schedule.assistantIsOperations === true;
+	const assistantIsOperations = schedule.assistantIsOperations === true;
 
-  // ========================================================
-  // 보고 상태
-  // ========================================================
+	// ========================================================
+	// 보고 상태
+	// ========================================================
 
-  const mainComplete = schedule.mainEndReport === true;
+	const mainComplete = schedule.mainEndReport === true;
 
-  const assistantStartComplete = schedule.assistantStartReport === true;
+	const assistantStartComplete = schedule.assistantStartReport === true;
 
-  const assistantEndComplete = schedule.assistantEndReport === true;
+	const assistantEndComplete = schedule.assistantEndReport === true;
 
-  // ========================================================
-  // 보고 제출 시간
-  // ========================================================
+	// ========================================================
+	// 보고 제출 시간
+	// ========================================================
 
-  const mainEndReportTime = String(schedule.mainEndReportTime || "").trim();
+	const mainEndReportTime = String(schedule.mainEndReportTime || "").trim();
 
-  const assistantStartReportTime = String(
-    schedule.assistantStartReportTime || "",
-  ).trim();
+	const assistantStartReportTime = String(
+		schedule.assistantStartReportTime || "",
+	).trim();
 
-  const assistantEndReportTime = String(
-    schedule.assistantEndReportTime || "",
-  ).trim();
+	const assistantEndReportTime = String(
+		schedule.assistantEndReportTime || "",
+	).trim();
 
-  // ========================================================
-  // 상태 클래스
-  // ========================================================
+	// ========================================================
+	// 상태 클래스
+	// ========================================================
 
-  const mainStatusClass = mainComplete
-    ? "status-complete"
-    : "status-incomplete";
+	const mainStatusClass = mainComplete
+		? "status-complete"
+		: "status-incomplete";
 
-  const assistantStartStatusClass = assistantStartComplete
-    ? "status-complete"
-    : "status-incomplete";
+	const assistantStartStatusClass = assistantStartComplete
+		? "status-complete"
+		: "status-incomplete";
 
-  const assistantEndStatusClass = assistantEndComplete
-    ? "status-complete"
-    : "status-incomplete";
+	const assistantEndStatusClass = assistantEndComplete
+		? "status-complete"
+		: "status-incomplete";
 
-  // ========================================================
-  // 보고 문구
-  //
-  // 중요:
-  // 시간은 전부 박스 밖으로 분리한다.
-  //
-  // 주강사
-  //   [종료보고] 12:04
-  //
-  // 보조강사
-  //   [시작보고] 10:04
-  //   [종료보고] 12:30
-  // ========================================================
+	// ========================================================
+	// 보고 문구
+	//
+	// 중요:
+	// 시간은 전부 박스 밖으로 분리한다.
+	//
+	// 주강사
+	//   [종료보고] 12:04
+	//
+	// 보조강사
+	//   [시작보고] 10:04
+	//   [종료보고] 12:30
+	// ========================================================
 
-  const mainReportText = mainComplete ? "종료보고" : "종료보고 미제출";
+	const mainReportText = mainComplete ? "종료보고" : "종료보고 미제출";
 
-  const assistantStartReportText = assistantStartComplete
-    ? "시작보고"
-    : "시작보고 미제출";
+	const assistantStartReportText = assistantStartComplete
+		? "시작보고"
+		: "시작보고 미제출";
 
-  const assistantEndReportText = assistantEndComplete
-    ? "종료보고"
-    : "종료보고 미제출";
+	const assistantEndReportText = assistantEndComplete
+		? "종료보고"
+		: "종료보고 미제출";
 
-  // ========================================================
-  // 카드 HTML
-  // ========================================================
+	// ========================================================
+	// 카드 HTML
+	// ========================================================
 
-  card.innerHTML = `
+	card.innerHTML = `
     <div class="dispatch-header">
       <div class="dispatch-title">
         ${facilityName}
@@ -884,14 +884,14 @@ function createScheduleCard(schedule) {
               </span>
 
               ${
-                mainComplete && mainEndReportTime
-                  ? `
+								mainComplete && mainEndReportTime
+									? `
                     <span class="report-time">
                       ${escapeHtml(mainEndReportTime)}
                     </span>
                   `
-                  : ""
-              }
+									: ""
+							}
 
             </div>
 
@@ -916,8 +916,8 @@ function createScheduleCard(schedule) {
 
           <div class="teacher-name">
             ${escapeHtml(
-              assistantIsOperations ? "운영진 대체" : assistantTeacher || "-",
-            )}
+							assistantIsOperations ? "운영진 대체" : assistantTeacher || "-",
+						)}
           </div>
 
           <div class="assistant-status">
@@ -933,14 +933,14 @@ function createScheduleCard(schedule) {
               </span>
 
               ${
-                assistantStartComplete && assistantStartReportTime
-                  ? `
+								assistantStartComplete && assistantStartReportTime
+									? `
                     <span class="report-time">
                       ${escapeHtml(assistantStartReportTime)}
                     </span>
                   `
-                  : ""
-              }
+									: ""
+							}
 
             </div>
 
@@ -956,14 +956,14 @@ function createScheduleCard(schedule) {
               </span>
 
               ${
-                assistantEndComplete && assistantEndReportTime
-                  ? `
+								assistantEndComplete && assistantEndReportTime
+									? `
                     <span class="report-time">
                       ${escapeHtml(assistantEndReportTime)}
                     </span>
                   `
-                  : ""
-              }
+									: ""
+							}
 
             </div>
 
@@ -976,7 +976,7 @@ function createScheduleCard(schedule) {
     </div>
   `;
 
-  return card;
+	return card;
 }
 
 // ==========================================================
@@ -984,19 +984,19 @@ function createScheduleCard(schedule) {
 // ==========================================================
 
 function formatAdminDate(value) {
-  if (!value) {
-    return "";
-  }
+	if (!value) {
+		return "";
+	}
 
-  const text = String(value).trim();
+	const text = String(value).trim();
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    const parts = text.split("-");
+	if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+		const parts = text.split("-");
 
-    return parts[0] + "." + parts[1] + "." + parts[2];
-  }
+		return parts[0] + "." + parts[1] + "." + parts[2];
+	}
 
-  return text;
+	return text;
 }
 
 // ==========================================================
@@ -1004,15 +1004,15 @@ function formatAdminDate(value) {
 // ==========================================================
 
 function getInstructorName(value) {
-  if (!value) {
-    return "";
-  }
+	if (!value) {
+		return "";
+	}
 
-  if (typeof value === "object") {
-    return String(value.name || value.title || value.text || "").trim();
-  }
+	if (typeof value === "object") {
+		return String(value.name || value.title || value.text || "").trim();
+	}
 
-  return String(value).trim();
+	return String(value).trim();
 }
 
 // ==========================================================
@@ -1020,12 +1020,12 @@ function getInstructorName(value) {
 // ==========================================================
 
 function escapeHtml(value) {
-  return String(value == null ? "" : value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+	return String(value == null ? "" : value)
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#039;");
 }
 
 // ==========================================================
@@ -1033,23 +1033,23 @@ function escapeHtml(value) {
 // ==========================================================
 
 function getAdminWeekKey(date) {
-  const d = new Date(date);
+	const d = new Date(date);
 
-  d.setHours(0, 0, 0, 0);
+	d.setHours(0, 0, 0, 0);
 
-  const day = d.getDay();
+	const day = d.getDay();
 
-  const diff = day === 0 ? -6 : 1 - day;
+	const diff = day === 0 ? -6 : 1 - day;
 
-  d.setDate(d.getDate() + diff);
+	d.setDate(d.getDate() + diff);
 
-  const year = d.getFullYear();
+	const year = d.getFullYear();
 
-  const month = String(d.getMonth() + 1).padStart(2, "0");
+	const month = String(d.getMonth() + 1).padStart(2, "0");
 
-  const dateDay = String(d.getDate()).padStart(2, "0");
+	const dateDay = String(d.getDate()).padStart(2, "0");
 
-  return `${year}-${month}-${dateDay}`;
+	return `${year}-${month}-${dateDay}`;
 }
 
 // ==========================================================
@@ -1060,26 +1060,26 @@ function getAdminWeekKey(date) {
 let adminAutoRefreshTimer = null;
 
 function startAdminAutoRefresh() {
-  stopAdminAutoRefresh();
+	stopAdminAutoRefresh();
 
-  adminAutoRefreshTimer = setInterval(
-    function () {
-      if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "true") {
-        stopAdminAutoRefresh();
-        return;
-      }
+	adminAutoRefreshTimer = setInterval(
+		function () {
+			if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "true") {
+				stopAdminAutoRefresh();
+				return;
+			}
 
-      console.log("[운영진 자동 갱신] 최신 일정 조회");
+			console.log("[운영진 자동 갱신] 최신 일정 조회");
 
-      loadAdminData();
-    },
-    3 * 60 * 1000,
-  );
+			loadAdminData();
+		},
+		3 * 60 * 1000,
+	);
 }
 
 function stopAdminAutoRefresh() {
-  if (adminAutoRefreshTimer) {
-    clearInterval(adminAutoRefreshTimer);
-    adminAutoRefreshTimer = null;
-  }
+	if (adminAutoRefreshTimer) {
+		clearInterval(adminAutoRefreshTimer);
+		adminAutoRefreshTimer = null;
+	}
 }
