@@ -128,7 +128,7 @@ async function verifyAdminAccess() {
   }
 
   // 숫자만 허용
-  if (!/^\d{8}$/.test(authCode)) {
+  if (!/^\d{4}$/.test(authCode)) {
     alert("운영진 확인번호 4자리를 입력해주세요.");
     input.focus();
     return;
