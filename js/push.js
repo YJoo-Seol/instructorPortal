@@ -9,7 +9,7 @@
 
   const API_URL = "https://instructor-api.seol7518.workers.dev/";
 
-  const PUSH_SW_PATH = "./js/push-sw.js";
+  const PUSH_SW_PATH = "./push-sw.js";
 
   const VAPID_PUBLIC_KEY =
     "BJShc6OsyoOWt3ijM3E_UoWA9wXwqWmJlh4To582sFxYXqAIjUHH1QiHbnK21EWpveAf4ymhqcLd94VlZdYePoI";
