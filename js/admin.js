@@ -120,6 +120,10 @@ async function verifyAdminAccess() {
   }
 
   const authCode = String(input.value || "").trim();
+  console.log("[운영진 확인번호]", {
+    value: authCode,
+    length: authCode.length,
+  });
 
   if (!authCode) {
     alert("운영진 확인번호를 입력해주세요.");
