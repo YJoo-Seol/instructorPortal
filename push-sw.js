@@ -93,7 +93,7 @@ self.addEventListener("push", function (event) {
           typeof declarativeNotification.silent === "boolean"
             ? declarativeNotification.silent
             : false,
-
+        badge: "/instructorPortal/push-badge.png",
         data: {
           url: targetUrl || defaultUrl,
         },

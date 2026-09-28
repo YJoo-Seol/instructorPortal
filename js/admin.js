@@ -24,10 +24,21 @@ selectedAdminDate.setHours(0, 0, 0, 0);
 const ADMIN_CACHE_KEY = "adminDashboardCache";
 
 // ==========================================================
+// 새 보고 배지 상태
+// ==========================================================
+
+// 보고 상태의 이전값을 저장
+const ADMIN_REPORT_STATE_KEY = "adminReportState";
+
+// 읽지 않은 새 보고 건수
+const ADMIN_UNREAD_REPORT_COUNT_KEY = "adminUnreadReportCount";
+
+// ==========================================================
 // 초기화
 // ==========================================================
 
 document.addEventListener("DOMContentLoaded", function () {
+  initNewReportBadge();
   initAdminAuth();
 });
 
@@ -407,11 +418,25 @@ async function loadAdminData() {
           : "운영진 일정 조회에 실패했습니다.",
       );
     }
-
     // --------------------------------------------------------
     // 7. 최신 일정 반영
     // --------------------------------------------------------
 
+    // --------------------------------------------------------
+    // 새 제출 보고 감지
+    // --------------------------------------------------------
+    //
+    // 서버에서 받은 최신 데이터 기준으로
+    // 이전 상태 → 현재 상태를 비교한다.
+    //
+    // 최초 발견된 일정은 기존 보고로 간주하고
+    // 기준값만 저장한다.
+    // --------------------------------------------------------
+
+    detectNewAdminReports(
+      Array.isArray(result.schedules) ? result.schedules : [],
+      false,
+    );
     allAdminSchedules = Array.isArray(result.schedules) ? result.schedules : [];
 
     // --------------------------------------------------------
@@ -1133,4 +1158,318 @@ function stopAdminAutoRefresh() {
     clearInterval(adminAutoRefreshTimer);
     adminAutoRefreshTimer = null;
   }
+}
+// ==========================================================
+// 새로 제출된 보고 배지
+// ==========================================================
+//
+// 대상
+// - 주강사 종료보고
+// - 보조강사 시작보고
+// - 보조강사 종료보고
+//
+// 기준
+// false → true 로 변경된 보고만 새 제출로 판단
+//
+// 최초 로드
+// 현재 상태를 기준값으로 저장하고 알림을 발생시키지 않음.
+// ==========================================================
+
+// ----------------------------------------------------------
+// 일정별 고유 키 생성
+// ----------------------------------------------------------
+
+function getAdminReportScheduleKey(schedule) {
+  if (!schedule) {
+    return "";
+  }
+
+  // 서버에서 안정적인 ID가 내려오는 경우 우선 사용
+  const directId =
+    schedule.id ||
+    schedule.scheduleId ||
+    schedule.pageId ||
+    schedule.notionPageId ||
+    "";
+
+  if (directId) {
+    return String(directId).trim();
+  }
+
+  // ID가 없는 경우 일정 정보를 조합해서 키 생성
+  const date = String(schedule.date || "").trim();
+
+  const facility = String(schedule.facilityName || "").trim();
+
+  const startTime = String(schedule.startTime || schedule.time || "").trim();
+
+  const endTime = String(schedule.endTime || "").trim();
+
+  const mainTeacher = getInstructorName(schedule.mainTeacher);
+
+  const assistantTeacher = getInstructorName(schedule.assistantTeacher);
+
+  const assistantIsOperations =
+    schedule.assistantIsOperations === true ? "operations" : "assistant";
+
+  return [
+    date,
+    facility,
+    startTime,
+    endTime,
+    mainTeacher,
+    assistantTeacher,
+    assistantIsOperations,
+  ].join("|");
+}
+
+// ----------------------------------------------------------
+// 현재 보고 상태 추출
+// ----------------------------------------------------------
+
+function getAdminReportState(schedule) {
+  if (!schedule) {
+    return null;
+  }
+
+  return {
+    mainEndReport: schedule.mainEndReport === true,
+
+    assistantStartReport: schedule.assistantStartReport === true,
+
+    assistantEndReport: schedule.assistantEndReport === true,
+  };
+}
+
+// ----------------------------------------------------------
+// 저장된 보고 상태 불러오기
+// ----------------------------------------------------------
+
+function loadAdminReportStates() {
+  try {
+    const saved = localStorage.getItem(ADMIN_REPORT_STATE_KEY);
+
+    if (!saved) {
+      return {};
+    }
+
+    const parsed = JSON.parse(saved);
+
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+
+    return parsed;
+  } catch (error) {
+    console.warn("[새 보고 배지] 상태 불러오기 실패:", error);
+
+    return {};
+  }
+}
+
+// ----------------------------------------------------------
+// 보고 상태 저장
+// ----------------------------------------------------------
+
+function saveAdminReportStates(states) {
+  try {
+    localStorage.setItem(ADMIN_REPORT_STATE_KEY, JSON.stringify(states));
+  } catch (error) {
+    console.warn("[새 보고 배지] 상태 저장 실패:", error);
+  }
+}
+
+// ----------------------------------------------------------
+// 읽지 않은 보고 건수 불러오기
+// ----------------------------------------------------------
+
+function getUnreadAdminReportCount() {
+  try {
+    const value = localStorage.getItem(ADMIN_UNREAD_REPORT_COUNT_KEY);
+
+    const count = parseInt(value, 10);
+
+    if (Number.isNaN(count) || count < 0) {
+      return 0;
+    }
+
+    return count;
+  } catch (error) {
+    return 0;
+  }
+}
+
+// ----------------------------------------------------------
+// 읽지 않은 보고 건수 저장
+// ----------------------------------------------------------
+
+function saveUnreadAdminReportCount(count) {
+  try {
+    const safeCount = Math.max(0, parseInt(count, 10) || 0);
+
+    localStorage.setItem(ADMIN_UNREAD_REPORT_COUNT_KEY, String(safeCount));
+  } catch (error) {
+    console.warn("[새 보고 배지] 읽지 않은 건수 저장 실패:", error);
+  }
+}
+
+// ----------------------------------------------------------
+// 배지 화면 업데이트
+// ----------------------------------------------------------
+
+function updateNewReportBadge() {
+  const badge = document.getElementById("newReportBadge");
+
+  const countElement = document.getElementById("newReportBadgeCount");
+
+  if (!badge || !countElement) {
+    return;
+  }
+
+  const count = getUnreadAdminReportCount();
+
+  if (count <= 0) {
+    badge.style.display = "none";
+    badge.classList.remove("has-many");
+    countElement.textContent = "0";
+    return;
+  }
+
+  badge.style.display = "flex";
+
+  countElement.textContent = count > 99 ? "99+" : String(count);
+
+  if (count >= 10) {
+    badge.classList.add("has-many");
+  } else {
+    badge.classList.remove("has-many");
+  }
+}
+
+// ----------------------------------------------------------
+// 새 제출 보고 감지
+// ----------------------------------------------------------
+//
+// 이전 상태
+// false
+//
+// 현재 상태
+// true
+//
+// → 새 제출 1건
+//
+// 최초로 발견한 일정은 현재 상태를 기준값으로만 저장.
+// 기존에 이미 완료된 보고를 새 알림으로 세지 않음.
+// ----------------------------------------------------------
+
+function detectNewAdminReports(schedules, isInitialState) {
+  if (!Array.isArray(schedules)) {
+    return;
+  }
+
+  const savedStates = loadAdminReportStates();
+
+  let unreadCount = getUnreadAdminReportCount();
+
+  let stateChanged = false;
+
+  schedules.forEach(function (schedule) {
+    if (!schedule) {
+      return;
+    }
+
+    const scheduleKey = getAdminReportScheduleKey(schedule);
+
+    if (!scheduleKey) {
+      return;
+    }
+
+    const currentState = getAdminReportState(schedule);
+
+    if (!currentState) {
+      return;
+    }
+
+    const previousState = savedStates[scheduleKey];
+
+    // ------------------------------------------------------
+    // 최초 발견
+    // ------------------------------------------------------
+    //
+    // 현재 상태를 기준값으로 저장만 한다.
+    // 기존 완료 보고를 새 알림으로 세지 않는다.
+    // ------------------------------------------------------
+
+    if (!previousState) {
+      savedStates[scheduleKey] = currentState;
+      stateChanged = true;
+      return;
+    }
+
+    // ------------------------------------------------------
+    // 이후 조회
+    // false → true만 새 제출로 인정
+    // ------------------------------------------------------
+
+    if (!isInitialState) {
+      if (
+        previousState.mainEndReport === false &&
+        currentState.mainEndReport === true
+      ) {
+        unreadCount++;
+      }
+
+      if (
+        previousState.assistantStartReport === false &&
+        currentState.assistantStartReport === true
+      ) {
+        unreadCount++;
+      }
+
+      if (
+        previousState.assistantEndReport === false &&
+        currentState.assistantEndReport === true
+      ) {
+        unreadCount++;
+      }
+    }
+
+    // 현재 상태로 갱신
+    savedStates[scheduleKey] = currentState;
+
+    stateChanged = true;
+  });
+
+  if (stateChanged) {
+    saveAdminReportStates(savedStates);
+  }
+
+  saveUnreadAdminReportCount(unreadCount);
+
+  updateNewReportBadge();
+}
+
+// ----------------------------------------------------------
+// 배지 읽음 처리
+// ----------------------------------------------------------
+//
+// 운영진이 빨간 배지를 클릭하면
+// 현재까지 쌓인 새 보고를 읽음 처리.
+// 이후 새로 false → true가 되는 보고만 다시 카운트.
+// ----------------------------------------------------------
+
+function markNewReportsAsRead() {
+  saveUnreadAdminReportCount(0);
+
+  updateNewReportBadge();
+
+  console.log("[새 보고 배지] 읽음 처리 완료");
+}
+
+// ----------------------------------------------------------
+// 페이지 진입 시 배지 상태 표시
+// ----------------------------------------------------------
+
+function initNewReportBadge() {
+  updateNewReportBadge();
 }

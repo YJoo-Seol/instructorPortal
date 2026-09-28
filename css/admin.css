@@ -935,3 +935,70 @@
     gap: 10px;
   }
 }
+
+/* ============================================================
+   새로 제출된 보고 배지
+   - 주강사 종료보고
+   - 보조강사 시작보고
+   - 보조강사 종료보고
+   ============================================================ */
+
+.admin-title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 테마 색상에 맞춘 새 보고 배지 */
+.new-report-badge {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  margin: 0;
+
+  border: none;
+  border-radius: 50%;
+
+  background: #4c8ce4;
+  color: #fff;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+
+  cursor: pointer;
+
+  box-sizing: border-box;
+
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.new-report-badge:hover {
+  background: #406093;
+  transform: scale(1.05);
+}
+
+.new-report-badge:active {
+  transform: scale(0.95);
+}
+
+#newReportBadgeCount {
+  display: block;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* 10건 이상이면 숫자가 들어갈 수 있도록 살짝 넓게 */
+.new-report-badge.has-many {
+  min-width: 30px;
+  width: auto;
+  padding: 0 7px;
+  border-radius: 999px;
+}
