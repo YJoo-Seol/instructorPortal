@@ -1,6 +1,7 @@
 // ============================================================
 // B&K 창의배움터 Web Push
 // 운영진 인증 버튼의 사용자 제스처에서 구독 등록
+// iPhone / iPadOS Home Screen Web App 대응
 // ============================================================
 
 (function () {
@@ -11,12 +12,28 @@
   const PUSH_SW_PATH = "./js/push-sw.js";
 
   const VAPID_PUBLIC_KEY =
-    "BJShc6OsyoOWt3ijM3E_UoWA9wXqWmJlh4To582sFxYXqAIjUHH1QiHbnK21EWpveAf4ymhqcLd94VlZdYePoI";
+    "BJShc6OsyoOWt3ijM3E_UoWA9wXwqWmJlh4To582sFxYXqAIjUHH1QiHbnK21EWpveAf4ymhqcLd94VlZdYePoI";
 
-  // VAPID 키 변경 후 새 구독을 강제하는 버전
-  const MIGRATION_KEY = "webPushVapidMigration_v3";
+  // ------------------------------------------------------------
+  // VAPID 키 변경에 따른 기존 Subscription 1회 초기화
+  // ------------------------------------------------------------
+
+  const MIGRATION_KEY = "webPushVapidMigration_v4";
+
+  // ------------------------------------------------------------
+  // 중복 실행 방지
+  // ------------------------------------------------------------
 
   let setupPromise = null;
+
+  // ------------------------------------------------------------
+  // Service Worker 등록 Promise
+  //
+  // 페이지가 열릴 때 미리 Service Worker를 등록해 둔다.
+  // 실제 Push Subscription은 운영진 확인 버튼에서 생성한다.
+  // ------------------------------------------------------------
+
+  let serviceWorkerRegistrationPromise = null;
 
   // ============================================================
   // Base64URL → Uint8Array
@@ -33,7 +50,7 @@
 
     const outputArray = new Uint8Array(rawData.length);
 
-    for (let i = 0; i < rawData.length; ++i) {
+    for (let i = 0; i < rawData.length; i++) {
       outputArray[i] = rawData.charCodeAt(i);
     }
 
@@ -64,15 +81,67 @@
       worker.addEventListener("statechange", () => {
         if (worker.state === "activated") {
           clearTimeout(timeout);
+
           resolve(registration);
         }
 
         if (worker.state === "redundant") {
           clearTimeout(timeout);
+
           reject(new Error("Service Worker가 비정상 종료되었습니다."));
         }
       });
     });
+  }
+
+  // ============================================================
+  // Service Worker 준비
+  //
+  // 중요:
+  // window.PushManager를 검사하지 않는다.
+  //
+  // 기존 Web Push는
+  // ServiceWorkerRegistration.pushManager
+  // 를 사용한다.
+  // ============================================================
+
+  async function prepareServiceWorker() {
+    if (!("serviceWorker" in navigator)) {
+      console.log("[Web Push] Service Worker 미지원");
+
+      return null;
+    }
+
+    if (!serviceWorkerRegistrationPromise) {
+      serviceWorkerRegistrationPromise = (async function () {
+        try {
+          const registration =
+            await navigator.serviceWorker.register(PUSH_SW_PATH);
+
+          console.log(
+            "[Web Push] Service Worker 등록 완료:",
+            registration.scope,
+          );
+
+          await waitForServiceWorkerActive(registration);
+
+          console.log("[Web Push] Service Worker 활성화 완료");
+
+          // 전역 보관
+          window.__BNK_PUSH_REGISTRATION__ = registration;
+
+          return registration;
+        } catch (error) {
+          console.error("[Web Push] Service Worker 등록 실패:", error);
+
+          serviceWorkerRegistrationPromise = null;
+
+          throw error;
+        }
+      })();
+    }
+
+    return await serviceWorkerRegistrationPromise;
   }
 
   // ============================================================
@@ -82,18 +151,25 @@
   async function saveSubscription(subscription) {
     const data = subscription.toJSON();
 
+    console.log("[Web Push] Worker 구독 등록 요청");
+
     const response = await fetch(API_URL, {
       method: "POST",
+
       headers: {
         "Content-Type": "text/plain;charset=UTF-8",
       },
+
       body: JSON.stringify({
         action: "registerPushSubscription",
+
         subscription: data,
       }),
     });
 
     const result = await response.json();
+
+    console.log("[Web Push] Worker 구독 등록 응답:", result);
 
     if (!response.ok || !result.success) {
       throw new Error(result.message || "웹 푸시 구독 저장에 실패했습니다.");
@@ -103,7 +179,7 @@
   }
 
   // ============================================================
-  // 기존 PushSubscription 삭제
+  // 기존 Subscription 서버 + 브라우저 삭제
   // ============================================================
 
   async function removeSubscription(subscription) {
@@ -113,24 +189,41 @@
 
     const subscriptionData = subscription.toJSON();
 
+    // ----------------------------------------------------------
+    // 1. Worker KV에서 삭제
+    // ----------------------------------------------------------
+
     try {
       const response = await fetch(API_URL, {
         method: "POST",
+
         headers: {
           "Content-Type": "text/plain;charset=UTF-8",
         },
+
         body: JSON.stringify({
           action: "removePushSubscription",
+
           subscription: subscriptionData,
         }),
       });
 
-      const result = await response.json();
+      let result = null;
+
+      try {
+        result = await response.json();
+      } catch (e) {
+        result = null;
+      }
 
       console.log("[Web Push] 기존 Subscription 서버 삭제 응답:", result);
     } catch (error) {
       console.warn("[Web Push] 기존 Subscription 서버 삭제 실패:", error);
     }
+
+    // ----------------------------------------------------------
+    // 2. 브라우저 Subscription 해제
+    // ----------------------------------------------------------
 
     try {
       const unsubscribed = await subscription.unsubscribe();
@@ -143,10 +236,16 @@
 
   // ============================================================
   // Web Push 설정
+  //
+  // 중요:
+  // 이 함수는 운영진 확인 버튼 클릭에서 호출된다.
   // ============================================================
 
   async function setupWebPush() {
+    // ----------------------------------------------------------
     // 중복 실행 방지
+    // ----------------------------------------------------------
+
     if (setupPromise) {
       return setupPromise;
     }
@@ -155,22 +254,19 @@
       try {
         console.log("[Web Push] 설정 시작");
 
-        // --------------------------------------------------------
-        // 지원 여부
-        // --------------------------------------------------------
+        // ------------------------------------------------------
+        // 기본 지원 여부
+        // ------------------------------------------------------
 
         if (!("serviceWorker" in navigator)) {
           console.log("[Web Push] Service Worker 미지원");
-          return;
-        }
 
-        if (!("PushManager" in window)) {
-          console.log("[Web Push] Push API 미지원");
           return;
         }
 
         if (!("Notification" in window)) {
           console.log("[Web Push] Notification API 미지원");
+
           return;
         }
 
@@ -179,10 +275,11 @@
           Notification.permission,
         );
 
-        // --------------------------------------------------------
-        // 권한 요청
-        // 중요: 이 함수 자체가 사용자 버튼 클릭에서 직접 호출되어야 함
-        // --------------------------------------------------------
+        // ------------------------------------------------------
+        // 알림 권한
+        //
+        // 운영진 확인 버튼 클릭에서 setupWebPush()가 호출됨
+        // ------------------------------------------------------
 
         let permission = Notification.permission;
 
@@ -194,27 +291,51 @@
 
         if (permission !== "granted") {
           console.warn("[Web Push] 알림 권한이 허용되지 않았습니다.");
+
           return;
         }
 
-        // --------------------------------------------------------
-        // Service Worker 등록
-        // --------------------------------------------------------
+        // ------------------------------------------------------
+        // Service Worker
+        //
+        // 페이지 로딩 시 이미 등록을 시작해 두었으므로
+        // 여기서는 준비된 registration을 가져온다.
+        // ------------------------------------------------------
 
-        const registration =
-          await navigator.serviceWorker.register(PUSH_SW_PATH);
+        const registration = await prepareServiceWorker();
 
-        console.log("[Web Push] Service Worker 등록 완료");
+        if (!registration) {
+          console.error(
+            "[Web Push] Service Worker registration을 얻지 못했습니다.",
+          );
 
-        await waitForServiceWorkerActive(registration);
+          return;
+        }
 
-        console.log("[Web Push] Service Worker 활성화 완료");
+        // ------------------------------------------------------
+        // 중요
+        //
+        // window.PushManager가 아니라
+        // ServiceWorkerRegistration.pushManager 사용
+        // ------------------------------------------------------
 
         const pushManager = registration.pushManager;
 
-        // --------------------------------------------------------
+        if (!pushManager) {
+          console.error(
+            "[Web Push] ServiceWorkerRegistration.pushManager 미지원",
+          );
+
+          return;
+        }
+
+        console.log(
+          "[Web Push] ServiceWorkerRegistration.pushManager 확인 완료",
+        );
+
+        // ------------------------------------------------------
         // 기존 Subscription 확인
-        // --------------------------------------------------------
+        // ------------------------------------------------------
 
         let existingSubscription = await pushManager.getSubscription();
 
@@ -223,9 +344,9 @@
           existingSubscription ? existingSubscription.endpoint : "없음",
         );
 
-        // --------------------------------------------------------
-        // VAPID 변경에 따른 기존 구독 1회 초기화
-        // --------------------------------------------------------
+        // ------------------------------------------------------
+        // VAPID 키 변경 후 기존 Subscription 1회 초기화
+        // ------------------------------------------------------
 
         const migrated = localStorage.getItem(MIGRATION_KEY);
 
@@ -241,17 +362,18 @@
           console.log("[Web Push] 기존 VAPID Subscription 초기화 완료");
         }
 
-        // --------------------------------------------------------
+        // ------------------------------------------------------
         // 새 Subscription 생성
-        // --------------------------------------------------------
+        // ------------------------------------------------------
 
         let subscription = existingSubscription;
 
         if (!subscription) {
-          console.log("[Web Push] 새 Subscription 생성");
+          console.log("[Web Push] 새 Subscription 생성 시작");
 
           subscription = await pushManager.subscribe({
             userVisibleOnly: true,
+
             applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
           });
 
@@ -261,13 +383,11 @@
           );
         }
 
-        // --------------------------------------------------------
-        // Worker에 저장
-        // --------------------------------------------------------
+        // ------------------------------------------------------
+        // Worker KV 등록
+        // ------------------------------------------------------
 
         const result = await saveSubscription(subscription);
-
-        console.log("[Web Push] Worker 등록 응답:", result);
 
         console.log("[Web Push] 최종 등록 완료");
 
@@ -279,7 +399,13 @@
       } catch (error) {
         console.error("[Web Push] 설정 오류:", error);
 
-        throw error;
+        window.__BNK_PUSH_READY__ = false;
+
+        // 인증 자체를 막지는 않도록
+        return {
+          success: false,
+          error: error.message || String(error),
+        };
       } finally {
         setupPromise = null;
       }
@@ -294,7 +420,11 @@
 
   async function removeWebPush() {
     try {
-      const registration = await navigator.serviceWorker.getRegistration();
+      let registration = window.__BNK_PUSH_REGISTRATION__ || null;
+
+      if (!registration) {
+        registration = await prepareServiceWorker();
+      }
 
       if (!registration) {
         return {
@@ -316,6 +446,8 @@
 
       window.__BNK_PUSH_READY__ = false;
 
+      localStorage.removeItem(MIGRATION_KEY);
+
       return {
         success: true,
       };
@@ -328,6 +460,26 @@
       };
     }
   }
+
+  // ============================================================
+  // 페이지가 열리면 Service Worker 먼저 준비
+  //
+  // 실제 Subscription 생성은 하지 않는다.
+  // 권한/구독은 운영진 확인 버튼에서 처리한다.
+  // ============================================================
+
+  prepareServiceWorker()
+    .then(function (registration) {
+      if (registration) {
+        console.log("[Web Push] 페이지 로드 시 Service Worker 준비 완료");
+      }
+    })
+    .catch(function (error) {
+      console.warn(
+        "[Web Push] 페이지 로드 시 Service Worker 준비 실패:",
+        error,
+      );
+    });
 
   // ============================================================
   // 전역 노출
