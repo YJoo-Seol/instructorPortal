@@ -260,13 +260,11 @@
 
         if (!("serviceWorker" in navigator)) {
           console.log("[Web Push] Service Worker 미지원");
-
           return;
         }
 
         if (!("Notification" in window)) {
           console.log("[Web Push] Notification API 미지원");
-
           return;
         }
 
@@ -277,8 +275,6 @@
 
         // ------------------------------------------------------
         // 알림 권한
-        //
-        // 운영진 확인 버튼 클릭에서 setupWebPush()가 호출됨
         // ------------------------------------------------------
 
         let permission = Notification.permission;
@@ -295,29 +291,132 @@
           return;
         }
 
+        // ======================================================
+        // 기존 Service Worker 확인
+        // ======================================================
+
+        const registrations = await navigator.serviceWorker.getRegistrations();
+
+        console.log("[Web Push] 기존 Service Worker 수:", registrations.length);
+
         // ------------------------------------------------------
-        // Service Worker
+        // 예전 /js/push-sw.js 등록 제거
+        // ------------------------------------------------------
+
+        for (const reg of registrations) {
+          const scriptURL =
+            (reg.active || reg.waiting || reg.installing)?.scriptURL || "";
+
+          console.log("[Web Push] 기존 SW:", scriptURL);
+
+          if (scriptURL.includes("/js/push-sw.js")) {
+            console.log("[Web Push] 기존 /js/push-sw.js 등록 제거");
+
+            try {
+              const oldSubscription = await reg.pushManager.getSubscription();
+
+              if (oldSubscription) {
+                console.log("[Web Push] 기존 /js/ Subscription 해제");
+
+                try {
+                  await oldSubscription.unsubscribe();
+                } catch (unsubscribeError) {
+                  console.warn(
+                    "[Web Push] 기존 Subscription 해제 실패:",
+                    unsubscribeError,
+                  );
+                }
+              }
+            } catch (subscriptionError) {
+              console.warn(
+                "[Web Push] 기존 Subscription 확인 실패:",
+                subscriptionError,
+              );
+            }
+
+            try {
+              await reg.unregister();
+
+              console.log("[Web Push] 기존 /js/push-sw.js unregister 완료");
+            } catch (unregisterError) {
+              console.warn(
+                "[Web Push] 기존 Service Worker unregister 실패:",
+                unregisterError,
+              );
+            }
+          }
+        }
+
+        // ======================================================
+        // 현재 Service Worker
         //
-        // 페이지 로딩 시 이미 등록을 시작해 두었으므로
-        // 여기서는 준비된 registration을 가져온다.
+        // 반드시:
+        // /instructorPortal/push-sw.js
+        // ======================================================
+
+        console.log("[Web Push] 새 Service Worker 등록:", PUSH_SW_PATH);
+
+        const registration = await navigator.serviceWorker.register(
+          PUSH_SW_PATH,
+          {
+            scope: "./",
+          },
+        );
+
+        console.log("[Web Push] Service Worker 등록 완료:", registration.scope);
+
+        // ------------------------------------------------------
+        // 최신 파일 업데이트 강제 확인
         // ------------------------------------------------------
 
-        const registration = await prepareServiceWorker();
+        try {
+          await registration.update();
 
-        if (!registration) {
-          console.error(
-            "[Web Push] Service Worker registration을 얻지 못했습니다.",
+          console.log("[Web Push] Service Worker update 완료");
+        } catch (updateError) {
+          console.warn(
+            "[Web Push] Service Worker update 확인 실패:",
+            updateError,
           );
+        }
+
+        // ------------------------------------------------------
+        // Service Worker가 활성화될 때까지 대기
+        // ------------------------------------------------------
+
+        if (registration.installing || registration.waiting) {
+          await new Promise(function (resolve) {
+            const checkState = function () {
+              if (registration.active) {
+                resolve();
+                return;
+              }
+
+              const worker = registration.installing || registration.waiting;
+
+              if (worker) {
+                worker.addEventListener("statechange", checkState);
+              }
+            };
+
+            checkState();
+          });
+        }
+
+        if (!registration.active) {
+          console.error("[Web Push] 활성 Service Worker가 없습니다.");
 
           return;
         }
 
-        // ------------------------------------------------------
-        // 중요
-        //
-        // window.PushManager가 아니라
-        // ServiceWorkerRegistration.pushManager 사용
-        // ------------------------------------------------------
+        console.log(
+          "[Web Push] 활성 Service Worker 확인:",
+          registration.active.scriptURL,
+        );
+
+        // ======================================================
+        // PushManager
+        // ======================================================
 
         const pushManager = registration.pushManager;
 
@@ -329,13 +428,11 @@
           return;
         }
 
-        console.log(
-          "[Web Push] ServiceWorkerRegistration.pushManager 확인 완료",
-        );
+        console.log("[Web Push] pushManager 확인 완료");
 
-        // ------------------------------------------------------
-        // 기존 Subscription 확인
-        // ------------------------------------------------------
+        // ======================================================
+        // 기존 Subscription
+        // ======================================================
 
         let existingSubscription = await pushManager.getSubscription();
 
@@ -344,27 +441,43 @@
           existingSubscription ? existingSubscription.endpoint : "없음",
         );
 
-        // ------------------------------------------------------
-        // VAPID 키 변경 후 기존 Subscription 1회 초기화
-        // ------------------------------------------------------
+        // ======================================================
+        // VAPID 변경 후 기존 Subscription 1회 초기화
+        // ======================================================
 
         const migrated = localStorage.getItem(MIGRATION_KEY);
 
         if (!migrated && existingSubscription) {
           console.log("[Web Push] 기존 Subscription 초기화 시작");
 
-          await removeSubscription(existingSubscription);
+          try {
+            await removeSubscription(existingSubscription);
+          } catch (removeError) {
+            console.warn(
+              "[Web Push] 기존 Subscription 초기화 실패:",
+              removeError,
+            );
+
+            try {
+              await existingSubscription.unsubscribe();
+            } catch (unsubscribeError) {
+              console.warn(
+                "[Web Push] 기존 Subscription unsubscribe 실패:",
+                unsubscribeError,
+              );
+            }
+          }
 
           existingSubscription = null;
 
           localStorage.setItem(MIGRATION_KEY, "true");
 
-          console.log("[Web Push] 기존 VAPID Subscription 초기화 완료");
+          console.log("[Web Push] 기존 Subscription 초기화 완료");
         }
 
-        // ------------------------------------------------------
-        // 새 Subscription 생성
-        // ------------------------------------------------------
+        // ======================================================
+        // 새 Subscription
+        // ======================================================
 
         let subscription = existingSubscription;
 
@@ -383,9 +496,9 @@
           );
         }
 
-        // ------------------------------------------------------
+        // ======================================================
         // Worker KV 등록
-        // ------------------------------------------------------
+        // ======================================================
 
         const result = await saveSubscription(subscription);
 
@@ -401,7 +514,6 @@
 
         window.__BNK_PUSH_READY__ = false;
 
-        // 인증 자체를 막지는 않도록
         return {
           success: false,
           error: error.message || String(error),
@@ -413,7 +525,6 @@
 
     return setupPromise;
   }
-
   // ============================================================
   // Push 구독 해제
   // ============================================================

@@ -1,7 +1,7 @@
 /* ============================================================
    기본(PC 기준) 스타일
    ============================================================ */
-.schedule-container {
+.container {
   width: 100%;
   max-width: 1200px;
   margin: 40px auto;
@@ -14,7 +14,7 @@
 
 .portal-header {
   width: 100%;
-  margin-bottom: 24px;
+  /* margin-bottom: 24px; */
 }
 
 .portal-header-top {
@@ -356,7 +356,7 @@ table.data-table th {
 .phone-verification-area {
   width: 100%;
   max-width: 520px;
-  margin: 24px auto 0;
+  margin: 0 auto;
   padding: 20px;
   box-sizing: border-box;
   text-align: center;
@@ -375,7 +375,7 @@ table.data-table th {
 
 .phone-verification-sub {
   width: 100%;
-  margin: 0 0 16px;
+  margin: 0 0 24px;
   font-size: 14px;
   line-height: 1.5;
   color: #7a8491;
