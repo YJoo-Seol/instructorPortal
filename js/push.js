@@ -4,311 +4,296 @@
 // ============================================================
 
 (function () {
-	"use strict";
+  "use strict";
 
-	const API_URL = "https://instructor-api.seol7518.workers.dev/";
+  const API_URL = "https://instructor-api.seol7518.workers.dev/";
 
-	const PUSH_SW_PATH = "./js/push-sw.js";
+  const PUSH_SW_PATH = "./js/push-sw.js";
 
-	const VAPID_PUBLIC_KEY =
-		"BJShc6OsyoOWt3ijM3E_UoWA9wXwqWmJlh4To582sFxYXqAIjUHH1QiHbnK21EWpveAf4ymhqcLd94VlZdYePoI";
+  const VAPID_PUBLIC_KEY =
+    "BJShc6OsyoOWt3ijM3E_UoWA9wXwqWmJlh4To582sFxYXqAIjUHH1QiHbnK21EWpveAf4ymhqcLd94VlZdYePoI";
 
-	let setupPromise = null;
+  let setupPromise = null;
 
-	// ==========================================================
-	// Base64URL → Uint8Array
-	// ==========================================================
+  // ==========================================================
+  // Base64URL → Uint8Array
+  // ==========================================================
 
-	function urlBase64ToUint8Array(base64String) {
-		const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
 
-		const base64 = (base64String + padding)
-			.replace(/-/g, "+")
-			.replace(/_/g, "/");
+    const base64 = (base64String + padding)
+      .replace(/-/g, "+")
+      .replace(/_/g, "/");
 
-		const rawData = window.atob(base64);
+    const rawData = window.atob(base64);
 
-		const outputArray = new Uint8Array(rawData.length);
+    const outputArray = new Uint8Array(rawData.length);
 
-		for (let i = 0; i < rawData.length; ++i) {
-			outputArray[i] = rawData.charCodeAt(i);
-		}
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
 
-		return outputArray;
-	}
+    return outputArray;
+  }
 
-	// ==========================================================
-	// Service Worker 활성화 대기
-	// ==========================================================
+  // ==========================================================
+  // Service Worker 활성화 대기
+  // ==========================================================
 
-	function waitForServiceWorkerActive(registration) {
-		if (registration.active) {
-			return Promise.resolve(registration);
-		}
+  function waitForServiceWorkerActive(registration) {
+    if (registration.active) {
+      return Promise.resolve(registration);
+    }
 
-		return new Promise((resolve, reject) => {
-			const worker = registration.installing || registration.waiting;
+    return new Promise((resolve, reject) => {
+      const worker = registration.installing || registration.waiting;
 
-			if (!worker) {
-				reject(new Error("Service Worker 상태를 확인할 수 없습니다."));
-				return;
-			}
+      if (!worker) {
+        reject(new Error("Service Worker 상태를 확인할 수 없습니다."));
+        return;
+      }
 
-			const timeout = setTimeout(() => {
-				reject(new Error("Service Worker 활성화 시간이 초과되었습니다."));
-			}, 15000);
+      const timeout = setTimeout(() => {
+        reject(new Error("Service Worker 활성화 시간이 초과되었습니다."));
+      }, 15000);
 
-			worker.addEventListener("statechange", () => {
-				if (worker.state === "activated") {
-					clearTimeout(timeout);
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "activated") {
+          clearTimeout(timeout);
 
-					resolve(registration);
-				}
+          resolve(registration);
+        }
 
-				if (worker.state === "redundant") {
-					clearTimeout(timeout);
+        if (worker.state === "redundant") {
+          clearTimeout(timeout);
 
-					reject(new Error("Service Worker가 비정상 종료되었습니다."));
-				}
-			});
-		});
-	}
+          reject(new Error("Service Worker가 비정상 종료되었습니다."));
+        }
+      });
+    });
+  }
+
+  // ==========================================================
+  // Worker에 PushSubscription 저장
+  // ==========================================================
+
+  async function saveSubscription(subscription) {
+    const data = subscription.toJSON();
 
-	// ==========================================================
-	// Worker에 PushSubscription 저장
-	// ==========================================================
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=UTF-8",
+      },
+      body: JSON.stringify({
+        action: "registerPushSubscription",
+        subscription: data,
+      }),
+    });
 
-	async function saveSubscription(subscription) {
-		const data = subscription.toJSON();
+    const result = await response.json();
 
-		const response = await fetch(API_URL, {
-			method: "POST",
-			headers: {
-				"Content-Type": "text/plain;charset=UTF-8",
-			},
-			body: JSON.stringify({
-				action: "registerPushSubscription",
-				subscription: data,
-			}),
-		});
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "웹 푸시 구독 저장에 실패했습니다.");
+    }
 
-		const result = await response.json();
+    return result;
+  }
 
-		if (!response.ok || !result.success) {
-			throw new Error(result.message || "웹 푸시 구독 저장에 실패했습니다.");
-		}
+  // ==========================================================
+  // Web Push 설정
+  // ==========================================================
 
-		return result;
-	}
-
-	// ==========================================================
-	// Web Push 설정
-	// ==========================================================
-
-	async function setupWebPush() {
-		if (setupPromise) {
-			return setupPromise;
-		}
-
-		setupPromise = (async () => {
-			try {
-				console.log("========== Web Push 설정 시작 ==========");
-
-				// ----------------------------------------------------
-				// 지원 여부
-				// ----------------------------------------------------
-
-				if (!("serviceWorker" in navigator)) {
-					console.warn("[Web Push] Service Worker 미지원");
-
-					return {
-						success: false,
-						message: "Service Worker를 지원하지 않는 환경입니다.",
-					};
-				}
-
-				if (!("PushManager" in window)) {
-					console.warn("[Web Push] Push API 미지원");
-
-					return {
-						success: false,
-						message: "Web Push를 지원하지 않는 환경입니다.",
-					};
-				}
-
-				if (!("Notification" in window)) {
-					console.warn("[Web Push] Notification API 미지원");
-
-					return {
-						success: false,
-						message: "알림 기능을 지원하지 않는 환경입니다.",
-					};
-				}
-
-				// ----------------------------------------------------
-				// 알림 권한
-				// ----------------------------------------------------
-
-				let permission = Notification.permission;
-
-				console.log("[Web Push] 현재 권한:", permission);
-
-				if (permission === "denied") {
-					console.warn("[Web Push] 알림 권한이 차단되어 있습니다.");
-
-					return {
-						success: false,
-						permission: "denied",
-					};
-				}
-
-				if (permission === "default") {
-					permission = await Notification.requestPermission();
-				}
-
-				if (permission !== "granted") {
-					console.warn("[Web Push] 알림 권한 허용 안 됨:", permission);
-
-					return {
-						success: false,
-						permission,
-					};
-				}
-
-				// ----------------------------------------------------
-				// Service Worker 등록
-				// ----------------------------------------------------
-
-				const registration = await navigator.serviceWorker.register(
-					PUSH_SW_PATH,
-					{
-						scope: "./js/",
-					},
-				);
-
-				console.log("[Web Push] Service Worker 등록 완료:", registration.scope);
-
-				await waitForServiceWorkerActive(registration);
-
-				// ----------------------------------------------------
-				// 기존 구독 확인
-				// ----------------------------------------------------
-
-				let subscription = await registration.pushManager.getSubscription();
-
-				// ----------------------------------------------------
-				// 없으면 새로 구독
-				// ----------------------------------------------------
-
-				if (!subscription) {
-					console.log("[Web Push] 새 PushSubscription 생성");
-
-					const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-
-					subscription = await registration.pushManager.subscribe({
-						userVisibleOnly: true,
-						applicationServerKey,
-					});
-
-					console.log("[Web Push] 새 구독 생성 완료");
-				} else {
-					console.log("[Web Push] 기존 구독 사용");
-				}
-
-				// ----------------------------------------------------
-				// Worker에 저장
-				//
-				// 기존 구독이어도 항상 다시 저장해서
-				// KV가 비어 있어도 자동 복구
-				// ----------------------------------------------------
-
-				await saveSubscription(subscription);
-
-				window.__BNK_PUSH_SUBSCRIPTION__ = subscription;
-
-				window.__BNK_PUSH_READY__ = true;
-
-				console.log("========== Web Push 설정 완료 ==========");
-
-				return {
-					success: true,
-					subscription,
-				};
-			} catch (error) {
-				console.error("========== Web Push 설정 오류 ==========", error);
-
-				window.__BNK_PUSH_READY__ = false;
-
-				return {
-					success: false,
-					error: error.message || String(error),
-				};
-			}
-		})();
-
-		return setupPromise;
-	}
-
-	// ==========================================================
-	// Push 구독 해제
-	// ==========================================================
-
-	async function removeWebPush() {
-		try {
-			const registration =
-				await navigator.serviceWorker.getRegistration("./js/");
-
-			if (!registration) {
-				return {
-					success: true,
-				};
-			}
-
-			const subscription = await registration.pushManager.getSubscription();
-
-			if (!subscription) {
-				return {
-					success: true,
-				};
-			}
-
-			const subscriptionData = subscription.toJSON();
-
-			await fetch(API_URL, {
-				method: "POST",
-				headers: {
-					"Content-Type": "text/plain;charset=UTF-8",
-				},
-				body: JSON.stringify({
-					action: "removePushSubscription",
-					subscription: subscriptionData,
-				}),
-			});
-
-			await subscription.unsubscribe();
-
-			window.__BNK_PUSH_SUBSCRIPTION__ = null;
-
-			window.__BNK_PUSH_READY__ = false;
-
-			return {
-				success: true,
-			};
-		} catch (error) {
-			console.error("[Web Push] 구독 해제 실패:", error);
-
-			return {
-				success: false,
-				error: error.message || String(error),
-			};
-		}
-	}
-
-	// ==========================================================
-	// 전역 노출
-	// ==========================================================
-
-	window.setupWebPush = setupWebPush;
-
-	window.removeWebPush = removeWebPush;
+  async function setupWebPush() {
+    try {
+      if (!("serviceWorker" in navigator)) {
+        console.log("[Web Push] Service Worker 미지원");
+        return;
+      }
+
+      if (!("PushManager" in window)) {
+        console.log("[Web Push] Push API 미지원");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+
+      if (permission !== "granted") {
+        console.log("[Web Push] 알림 권한 없음:", permission);
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register(PUSH_SW_PATH);
+      console.log("[Web Push] Service Worker 등록 완료");
+
+      const pushManager = registration.pushManager;
+
+      // ============================================================
+      // 기존 Subscription 확인
+      // ============================================================
+
+      let existingSubscription = await pushManager.getSubscription();
+
+      console.log(
+        "[Web Push] 기존 Subscription:",
+        existingSubscription ? existingSubscription.endpoint : "없음",
+      );
+
+      // ============================================================
+      // VAPID 키 변경에 따른 기존 Subscription 1회 초기화
+      // ============================================================
+
+      const MIGRATION_KEY = "webPushVapidMigration_v2";
+      const migrated = localStorage.getItem(MIGRATION_KEY);
+
+      if (!migrated && existingSubscription) {
+        console.log("[Web Push] 기존 Subscription 초기화 시작");
+
+        // ----------------------------------------------------------
+        // 1. 기존 Subscription을 서버 KV에서 먼저 삭제
+        // ----------------------------------------------------------
+        try {
+          await removeWebPush(existingSubscription);
+          console.log("[Web Push] 기존 Subscription KV 삭제 완료");
+        } catch (removeError) {
+          console.warn(
+            "[Web Push] 기존 Subscription KV 삭제 실패:",
+            removeError,
+          );
+        }
+
+        // ----------------------------------------------------------
+        // 2. 브라우저 기존 Subscription 해제
+        // ----------------------------------------------------------
+        try {
+          const unsubscribed = await existingSubscription.unsubscribe();
+
+          console.log("[Web Push] 기존 Subscription 해제:", unsubscribed);
+        } catch (unsubscribeError) {
+          console.warn(
+            "[Web Push] 기존 Subscription 해제 실패:",
+            unsubscribeError,
+          );
+        }
+
+        existingSubscription = null;
+
+        localStorage.setItem(MIGRATION_KEY, "true");
+
+        console.log("[Web Push] 기존 VAPID Subscription 초기화 완료");
+      }
+
+      // ============================================================
+      // 새 Subscription 확인 / 생성
+      // ============================================================
+
+      let subscription = existingSubscription;
+
+      if (!subscription) {
+        console.log("[Web Push] 새 Subscription 생성");
+
+        subscription = await pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+
+        console.log(
+          "[Web Push] 새 Subscription 생성 완료:",
+          subscription.endpoint,
+        );
+      }
+
+      // ============================================================
+      // Worker에 Subscription 등록
+      // ============================================================
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "registerPushSubscription",
+          subscription: subscription,
+        }),
+      });
+
+      const result = await response.json();
+
+      console.log("[Web Push] Worker 등록 응답:", result);
+
+      if (!result || !result.success) {
+        console.error("[Web Push] Subscription 등록 실패:", result);
+        return;
+      }
+
+      console.log("[Web Push] 최종 등록 완료");
+    } catch (error) {
+      console.error("[Web Push] 설정 오류:", error);
+    }
+  }
+
+  // ==========================================================
+  // Push 구독 해제
+  // ==========================================================
+
+  async function removeWebPush() {
+    try {
+      const registration =
+        await navigator.serviceWorker.getRegistration("./js/");
+
+      if (!registration) {
+        return {
+          success: true,
+        };
+      }
+
+      const subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        return {
+          success: true,
+        };
+      }
+
+      const subscriptionData = subscription.toJSON();
+
+      await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=UTF-8",
+        },
+        body: JSON.stringify({
+          action: "removePushSubscription",
+          subscription: subscriptionData,
+        }),
+      });
+
+      await subscription.unsubscribe();
+
+      window.__BNK_PUSH_SUBSCRIPTION__ = null;
+
+      window.__BNK_PUSH_READY__ = false;
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error("[Web Push] 구독 해제 실패:", error);
+
+      return {
+        success: false,
+        error: error.message || String(error),
+      };
+    }
+  }
+
+  // ==========================================================
+  // 전역 노출
+  // ==========================================================
+
+  window.setupWebPush = setupWebPush;
+
+  window.removeWebPush = removeWebPush;
 })();
