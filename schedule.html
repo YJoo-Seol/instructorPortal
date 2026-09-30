@@ -33,17 +33,32 @@
           </div>
         </div>
         <div id="dateNavRange" class="date-nav-range"></div>
-        <!-- 날짜 이동 네비게이션 바 -->
-        <!-- 날짜 네비게이션 바 (텍스트는 JS가 자동으로 채워줍니다) -->
+
         <div class="date-nav-container">
-          <span class="date-nav-arrow" onclick="moveDate(-1)">◀</span>
+          <span
+            id="prevDateArrow"
+            class="date-nav-arrow"
+            onclick="moveDate(-1)"
+            aria-label="이전 날짜"
+          >
+            ◀
+          </span>
+
           <span
             id="dateNavDisplay"
             class="date-nav-text"
             onclick="resetToToday()"
             title="오늘 날짜로 이동"
           ></span>
-          <span class="date-nav-arrow" onclick="moveDate(1)">▶</span>
+
+          <span
+            id="nextDateArrow"
+            class="date-nav-arrow"
+            onclick="moveDate(1)"
+            aria-label="다음 날짜"
+          >
+            ▶
+          </span>
         </div>
 
         <!-- 오늘 출강 일정 -->

@@ -10,6 +10,9 @@ const ADMIN_AUTH_KEY = "adminAuthenticated";
 
 let allAdminSchedules = [];
 
+// 운영진 일정 조회 중 여부
+let adminSchedulesLoading = false;
+
 // ==========================================================
 // 관리자 선택 날짜
 // ==========================================================
@@ -327,16 +330,31 @@ function loadAdminDashboardCache() {
 // ==========================================================
 // 관리자 일정 조회
 //
-// 캐시가 있으면 먼저 즉시 표시
-// 이후 최신 데이터를 다시 조회해서 갱신
+// 동작
+// 1. 캐시가 있으면 즉시 화면 표시
+// 2. 최신 데이터 조회 중에는 "일정 없음" 표시 안 함
+// 3. 이미 조회 중이면 중복 서버 요청 방지
+// 4. 최신 데이터 조회 완료 후에만 실제 일정 없음 판단
+// 5. 조회 실패 시 기존 캐시가 있으면 기존 화면 유지
 // ==========================================================
 
 async function loadAdminData() {
   if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "true") {
     showAdminLogin();
-
     return;
   }
+
+  // --------------------------------------------------------
+  // 이미 서버 조회 중이면 중복 요청 방지
+  // --------------------------------------------------------
+
+  if (adminSchedulesLoading) {
+    console.log("[운영진 대시보드] 이미 일정 조회 중 → 중복 조회 방지");
+    return;
+  }
+
+  adminSchedulesLoading = true;
+
   try {
     // --------------------------------------------------------
     // 현재 선택 날짜
@@ -365,7 +383,9 @@ async function loadAdminData() {
 
       renderFilteredAdminSchedules();
     } else {
+      // ------------------------------------------------------
       // 캐시가 없을 때만 로딩 표시
+      // ------------------------------------------------------
 
       const list = document.getElementById("adminList");
 
@@ -375,6 +395,14 @@ async function loadAdminData() {
             일정을 불러오는 중입니다.
           </div>
         `;
+      }
+
+      // 캐시가 없고 아직 조회 중이므로
+      // 일정 없음 메시지는 숨김
+      const emptyMessage = document.getElementById("emptyMessage");
+
+      if (emptyMessage) {
+        emptyMessage.style.display = "none";
       }
     }
 
@@ -422,26 +450,26 @@ async function loadAdminData() {
           : "운영진 일정 조회에 실패했습니다.",
       );
     }
+
     // --------------------------------------------------------
     // 7. 최신 일정 반영
     // --------------------------------------------------------
 
+    const latestSchedules = Array.isArray(result.schedules)
+      ? result.schedules
+      : [];
+
     // --------------------------------------------------------
     // 새 제출 보고 감지
     // --------------------------------------------------------
-    //
-    // 서버에서 받은 최신 데이터 기준으로
-    // 이전 상태 → 현재 상태를 비교한다.
-    //
-    // 최초 발견된 일정은 기존 보고로 간주하고
-    // 기준값만 저장한다.
+
+    detectNewAdminReports(latestSchedules, false);
+
+    // --------------------------------------------------------
+    // 최신 일정 저장
     // --------------------------------------------------------
 
-    detectNewAdminReports(
-      Array.isArray(result.schedules) ? result.schedules : [],
-      false,
-    );
-    allAdminSchedules = Array.isArray(result.schedules) ? result.schedules : [];
+    allAdminSchedules = latestSchedules;
 
     // --------------------------------------------------------
     // 8. 캐시 갱신
@@ -488,6 +516,22 @@ async function loadAdminData() {
         </div>
       `;
     }
+
+    // 오류 시에도 "일정 없음"은 숨김
+    const emptyMessage = document.getElementById("emptyMessage");
+
+    if (emptyMessage) {
+      emptyMessage.style.display = "none";
+    }
+  } finally {
+    // --------------------------------------------------------
+    // 조회 종료
+    //
+    // renderAdminData()에서 이 값을 확인해서
+    // 조회 중에는 "일정 없음"을 표시하지 않도록 함
+    // --------------------------------------------------------
+
+    adminSchedulesLoading = false;
   }
 }
 
@@ -580,6 +624,7 @@ function updateAdminDateDisplay() {
 
     rangeDisplay.textContent = `${currentMonth}월 ${currentDay}일(${currentWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(${sundayWeekday})까지 조회 가능`;
   }
+  updateAdminDateArrowState();
 }
 
 // ==========================================================
@@ -587,45 +632,72 @@ function updateAdminDateDisplay() {
 // ==========================================================
 
 function moveDate(offset) {
-  const oldDate = new Date(selectedAdminDate);
+  console.log("[운영진 날짜 이동 실행]:", offset);
 
-  const newDate = new Date(selectedAdminDate);
+  const current = new Date(selectedAdminDate);
+  current.setHours(0, 0, 0, 0);
 
-  newDate.setDate(newDate.getDate() + offset);
+  // ----------------------------------------------------------
+  // 오늘 날짜
+  // ----------------------------------------------------------
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // ----------------------------------------------------------
+  // 오늘이 포함된 주의 일요일 계산
+  // ----------------------------------------------------------
+
+  const dayOfWeek = today.getDay();
+
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
+  sunday.setHours(0, 0, 0, 0);
+
+  // ----------------------------------------------------------
+  // 이동할 날짜 계산
+  // ----------------------------------------------------------
+
+  const newDate = new Date(current);
+
+  newDate.setDate(current.getDate() + offset);
 
   newDate.setHours(0, 0, 0, 0);
+
+  // ----------------------------------------------------------
+  // 조회 가능 범위 밖이면 이동 차단
+  //
+  // 오늘 이전 ❌
+  // 이번 주 일요일 이후 ❌
+  // ----------------------------------------------------------
+
+  if (newDate < today || newDate > sunday) {
+    console.log("[운영진 날짜 이동] 조회 가능 범위를 벗어나므로 이동 차단:", {
+      현재날짜: formatAdminDateKey(current),
+
+      이동날짜: formatAdminDateKey(newDate),
+
+      조회시작일: formatAdminDateKey(today),
+
+      조회종료일: formatAdminDateKey(sunday),
+    });
+
+    return;
+  }
+
+  // ----------------------------------------------------------
+  // 정상 이동
+  // ----------------------------------------------------------
 
   selectedAdminDate = newDate;
 
   updateAdminDateDisplay();
 
-  // ========================================================
-  // 기존 날짜와 새 날짜가 같은 주인지 확인
-  // ========================================================
+  // ----------------------------------------------------------
+  // 날짜가 변경되면 현재 주간 데이터에서 해당 날짜만 필터링
+  // ----------------------------------------------------------
 
-  const oldWeek = getAdminWeekKey(oldDate);
-
-  const newWeek = getAdminWeekKey(newDate);
-
-  // ========================================================
-  // 같은 주
-  // → 서버 요청 없이 기존 데이터에서 필터링
-  // ========================================================
-
-  if (oldWeek === newWeek) {
-    renderFilteredAdminSchedules();
-
-    return;
-  }
-
-  // ========================================================
-  // 다른 주
-  // → 새로운 주간 데이터 조회
-  // ========================================================
-
-  console.log("[운영진 날짜 이동] 주간 범위 변경 → 새 주 조회");
-
-  loadAdminData();
+  renderFilteredAdminSchedules();
 }
 
 // ==========================================================
@@ -805,10 +877,21 @@ function renderAdminData(schedules) {
 
   updateSummary(schedules.length, completeCount, incompleteCount);
 
+  // ============================================================
+  // 일정 없음 표시
+  // ============================================================
+
   const emptyMessage = document.getElementById("emptyMessage");
 
   if (emptyMessage) {
-    emptyMessage.style.display = schedules.length === 0 ? "block" : "none";
+    // 일정이 있으면 숨김
+    if (schedules.length > 0) {
+      emptyMessage.style.display = "none";
+    }
+    // 일정이 없으면 표시
+    else {
+      emptyMessage.style.display = "block";
+    }
   }
 }
 
@@ -1453,27 +1536,38 @@ function detectNewAdminReports(schedules, isInitialState) {
   updateNewReportBadge();
 }
 
-// ----------------------------------------------------------
-// 배지 읽음 처리
-// ----------------------------------------------------------
-//
-// 운영진이 빨간 배지를 클릭하면
-// 현재까지 쌓인 새 보고를 읽음 처리.
-// 이후 새로 false → true가 되는 보고만 다시 카운트.
-// ----------------------------------------------------------
+// ==========================================================
+// 날짜 이동 화살표 활성화 / 비활성화
+// ==========================================================
+function updateAdminDateArrowState() {
+  const prevArrow = document.getElementById("prevDateArrow");
+  const nextArrow = document.getElementById("nextDateArrow");
 
-function markNewReportsAsRead() {
-  saveUnreadAdminReportCount(0);
+  if (!prevArrow && !nextArrow) {
+    return;
+  }
 
-  updateNewReportBadge();
+  const current = new Date(selectedAdminDate);
+  current.setHours(0, 0, 0, 0);
 
-  console.log("[새 보고 배지] 읽음 처리 완료");
-}
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-// ----------------------------------------------------------
-// 페이지 진입 시 배지 상태 표시
-// ----------------------------------------------------------
+  // 오늘이 포함된 주의 일요일
+  const dayOfWeek = today.getDay();
 
-function initNewReportBadge() {
-  updateNewReportBadge();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
+  sunday.setHours(0, 0, 0, 0);
+
+  const canGoPrevious = current > today;
+  const canGoNext = current < sunday;
+
+  if (prevArrow) {
+    prevArrow.classList.toggle("disabled", !canGoPrevious);
+  }
+
+  if (nextArrow) {
+    nextArrow.classList.toggle("disabled", !canGoNext);
+  }
 }

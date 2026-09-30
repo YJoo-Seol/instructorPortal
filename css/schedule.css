@@ -927,3 +927,9 @@ input[type="file"]::file-selector-button:hover {
     object-fit: contain;
   }
 }
+
+.date-nav-arrow.disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}

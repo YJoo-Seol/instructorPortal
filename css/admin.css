@@ -1002,3 +1002,9 @@
   padding: 0 7px;
   border-radius: 999px;
 }
+
+.date-nav-arrow.disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}

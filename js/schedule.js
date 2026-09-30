@@ -855,7 +855,7 @@ function renderAssistantStartReport(schedule, index, device) {
       <button
         type="button"
         id="assistantStartOpen_${device}_${index}"
-        class="report-btn "
+        class="report-btn disabled"
         onclick="toggleAssistantStartReport(${index}, '${device}')"
       >
         시작보고
@@ -3014,6 +3014,7 @@ function updateDateDisplay() {
 
     rangeDisplay.textContent = `${currentMonth}월 ${currentDay}일(${currentWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(일)까지 조회 가능`;
   }
+  updateDateArrowState();
 }
 
 // ============================================================
@@ -3025,72 +3026,35 @@ function updateDateDisplay() {
 // ※ 오늘 ~ 이번 주 일요일까지만 이동 가능
 // ============================================================
 
-function moveDate(direction) {
-  console.log("날짜 이동 실행:", direction);
-
+function moveDate(offset) {
   const current = new Date(selectedScheduleDate);
   current.setHours(0, 0, 0, 0);
-
-  // ----------------------------------------------------------
-  // 오늘 날짜
-  // ----------------------------------------------------------
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // ----------------------------------------------------------
-  // 오늘이 포함된 주의 일요일 계산
-  // ----------------------------------------------------------
-
+  // 이번 주 일요일
   const dayOfWeek = today.getDay();
-
   const sunday = new Date(today);
-
   sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
-
   sunday.setHours(0, 0, 0, 0);
 
-  // ----------------------------------------------------------
-  // 이동할 날짜 계산
-  // ----------------------------------------------------------
+  const targetDate = new Date(current);
+  targetDate.setDate(targetDate.getDate() + offset);
+  targetDate.setHours(0, 0, 0, 0);
 
-  const newDate = new Date(current);
-
-  newDate.setDate(current.getDate() + direction);
-
-  newDate.setHours(0, 0, 0, 0);
-
-  // ----------------------------------------------------------
-  // 조회 가능 범위 밖이면 이동 차단
-  //
-  // 오늘 이전 ❌
-  // 이번 주 일요일 이후 ❌
-  // ----------------------------------------------------------
-
-  if (newDate < today || newDate > sunday) {
-    console.log("조회 가능 범위를 벗어나므로 날짜 이동 차단:", {
-      현재날짜: formatScheduleDateKey(current),
-
-      이동날짜: formatScheduleDateKey(newDate),
-
-      조회시작일: formatScheduleDateKey(today),
-
-      조회종료일: formatScheduleDateKey(sunday),
-    });
-
+  // 오늘 이전 / 이번 주 일요일 이후 이동 차단
+  if (targetDate < today || targetDate > sunday) {
     return;
   }
 
-  // ----------------------------------------------------------
-  // 정상 이동
-  // ----------------------------------------------------------
-
-  selectedScheduleDate = newDate;
+  selectedScheduleDate = targetDate;
 
   updateDateDisplay();
+  updateDateArrowState();
 
-  // 날짜가 변경되면 해당 날짜 일정 다시 렌더링
-  renderFilteredSchedules();
+  // 해당 날짜 일정 다시 조회/표시
+  loadInstructorSchedules();
 }
 
 // ============================================================
@@ -3396,3 +3360,35 @@ window.addEventListener("beforeunload", function (event) {
   event.returnValue =
     "보고서 제출이 완료되지 않았습니다. 페이지를 나가시겠습니까?";
 });
+
+function updateDateArrowState() {
+  const prevArrow = document.getElementById("prevDateArrow");
+  const nextArrow = document.getElementById("nextDateArrow");
+
+  if (!prevArrow && !nextArrow) {
+    return;
+  }
+
+  const current = new Date(selectedScheduleDate);
+  current.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // 이번 주 일요일
+  const dayOfWeek = today.getDay();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
+  sunday.setHours(0, 0, 0, 0);
+
+  const canGoPrevious = current > today;
+  const canGoNext = current < sunday;
+
+  if (prevArrow) {
+    prevArrow.classList.toggle("disabled", !canGoPrevious);
+  }
+
+  if (nextArrow) {
+    nextArrow.classList.toggle("disabled", !canGoNext);
+  }
+}
