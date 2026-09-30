@@ -1008,3 +1008,39 @@
   cursor: default;
   pointer-events: none;
 }
+
+.card-top .satisfaction-badge {
+  flex-shrink: 0;
+}
+
+.satisfaction-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.satisfaction-qr {
+  color: #406093;
+  background: #eef3fa;
+  animation: satisfaction-alert 1.2s infinite;
+}
+
+.satisfaction-qr-book {
+  color: #d32f2f;
+  background: #fff0f0;
+  animation: satisfaction-alert 1.2s infinite;
+}
+
+@keyframes satisfaction-alert {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}

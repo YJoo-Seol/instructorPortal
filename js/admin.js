@@ -438,6 +438,17 @@ async function loadAdminData() {
     // --------------------------------------------------------
 
     const result = await response.json();
+    console.log("[운영진 API 전체 응답]", result);
+
+    console.log(
+      "[운영진 만족도 데이터]",
+      (Array.isArray(result.schedules) ? result.schedules : []).map(
+        (schedule) => ({
+          facilityName: schedule.facilityName,
+          satisfaction: schedule.satisfaction,
+        }),
+      ),
+    );
 
     // --------------------------------------------------------
     // 6. 서버 결과 확인
@@ -913,6 +924,8 @@ function createScheduleCard(schedule) {
 
   const facilityName = escapeHtml(schedule.facilityName || "-");
 
+  const satisfactionBadge = getSatisfactionBadgeHtml(schedule.satisfaction);
+
   const startTime = String(schedule.startTime || schedule.time || "").trim();
 
   const endTime = String(schedule.endTime || "").trim();
@@ -1010,6 +1023,7 @@ function createScheduleCard(schedule) {
   card.innerHTML = `
     <div class="dispatch-header">
       <div class="dispatch-title">
+        ${satisfactionBadge}
         ${facilityName}
       </div>
     </div>
@@ -1400,13 +1414,11 @@ function saveUnreadAdminReportCount(count) {
   }
 }
 
-// ----------------------------------------------------------
-// 배지 화면 업데이트
-// ----------------------------------------------------------
-
+// ==========================================================
+// 새 보고 배지 표시
+// ==========================================================
 function updateNewReportBadge() {
   const badge = document.getElementById("newReportBadge");
-
   const countElement = document.getElementById("newReportBadgeCount");
 
   if (!badge || !countElement) {
@@ -1415,20 +1427,20 @@ function updateNewReportBadge() {
 
   const count = getUnreadAdminReportCount();
 
-  if (count <= 0) {
-    badge.style.display = "none";
-    badge.classList.remove("has-many");
-    countElement.textContent = "0";
-    return;
-  }
+  console.log("[새 보고 배지] 현재 미확인 건수:", count);
 
-  badge.style.display = "flex";
+  if (count > 0) {
+    countElement.textContent = String(count);
 
-  countElement.textContent = count > 99 ? "99+" : String(count);
+    badge.style.display = "flex";
 
-  if (count >= 10) {
-    badge.classList.add("has-many");
+    if (count >= 10) {
+      badge.classList.add("has-many");
+    } else {
+      badge.classList.remove("has-many");
+    }
   } else {
+    badge.style.display = "none";
     badge.classList.remove("has-many");
   }
 }
@@ -1478,6 +1490,12 @@ function detectNewAdminReports(schedules, isInitialState) {
     }
 
     const previousState = savedStates[scheduleKey];
+    console.log("[새 보고 감지]", {
+      facility: schedule.facilityName,
+      date: schedule.date,
+      previousState: previousState,
+      currentState: currentState,
+    });
 
     // ------------------------------------------------------
     // 최초 발견
@@ -1498,27 +1516,28 @@ function detectNewAdminReports(schedules, isInitialState) {
     // false → true만 새 제출로 인정
     // ------------------------------------------------------
 
-    if (!isInitialState) {
-      if (
-        previousState.mainEndReport === false &&
-        currentState.mainEndReport === true
-      ) {
-        unreadCount++;
-      }
+    if (
+      previousState.mainEndReport === false &&
+      currentState.mainEndReport === true
+    ) {
+      console.log("[새 보고 감지] 주강사 종료보고:", schedule.facilityName);
+      unreadCount++;
+    }
 
-      if (
-        previousState.assistantStartReport === false &&
-        currentState.assistantStartReport === true
-      ) {
-        unreadCount++;
-      }
+    if (
+      previousState.assistantStartReport === false &&
+      currentState.assistantStartReport === true
+    ) {
+      console.log("[새 보고 감지] 보조강사 시작보고:", schedule.facilityName);
+      unreadCount++;
+    }
 
-      if (
-        previousState.assistantEndReport === false &&
-        currentState.assistantEndReport === true
-      ) {
-        unreadCount++;
-      }
+    if (
+      previousState.assistantEndReport === false &&
+      currentState.assistantEndReport === true
+    ) {
+      console.log("[새 보고 감지] 보조강사 종료보고:", schedule.facilityName);
+      unreadCount++;
     }
 
     // 현재 상태로 갱신
@@ -1570,4 +1589,34 @@ function updateAdminDateArrowState() {
   if (nextArrow) {
     nextArrow.classList.toggle("disabled", !canGoNext);
   }
+}
+
+// ========================================
+// 만족도 조사 표시
+// ========================================
+
+function getSatisfactionBadgeHtml(satisfaction) {
+  const value = String(satisfaction || "").trim();
+
+  if (value === "QR") {
+    return `
+      <span class="satisfaction-badge satisfaction-qr">
+        📝만족도 진행
+      </span>
+    `;
+  }
+
+  if (value === "QR+출강부") {
+    return `
+      <span class="satisfaction-badge satisfaction-qr-book">
+        🚨만족도 진행 및 출강부 회수
+      </span>
+    `;
+  }
+
+  return "";
+}
+
+function initNewReportBadge() {
+  updateNewReportBadge();
 }

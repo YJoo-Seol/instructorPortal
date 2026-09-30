@@ -179,18 +179,6 @@ async function loadReportSchedules(data) {
     const targetDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
     // --------------------------------------------------------
-    // 현재 사용자가 보고 있는 날짜 저장
-    // --------------------------------------------------------
-
-    const initialSelectedDate = selectedScheduleDate
-      ? new Date(selectedScheduleDate)
-      : new Date(year, month - 1, day);
-
-    if (!selectedScheduleDate) {
-      selectedScheduleDate = new Date(year, month - 1, day);
-    }
-
-    // --------------------------------------------------------
     // 1. 캐시가 있으면 먼저 즉시 화면 표시
     // --------------------------------------------------------
 
@@ -382,17 +370,6 @@ async function loadReportSchedules(data) {
       count: allReportSchedules.length,
       schedules: allReportSchedules,
     });
-
-    // --------------------------------------------------------
-    // 7. 중요
-    //
-    // 서버 응답이 늦게 와도
-    // 사용자가 이동한 날짜는 그대로 유지한다.
-    // --------------------------------------------------------
-
-    if (!selectedScheduleDate) {
-      selectedScheduleDate = new Date(initialSelectedDate);
-    }
 
     // --------------------------------------------------------
     // 8. 최신 서버 결과를 캐시에 저장
@@ -3054,7 +3031,7 @@ function moveDate(offset) {
   updateDateArrowState();
 
   // 해당 날짜 일정 다시 조회/표시
-  loadInstructorSchedules();
+  renderFilteredSchedules();
 }
 
 // ============================================================
@@ -3153,23 +3130,41 @@ function renderFilteredSchedules() {
     const emptyMessage = document.getElementById("scheduleEmptyMessage");
 
     if (emptyMessage) {
-      const selectedDate = new Date(selectedScheduleDate);
+      let weekday = "";
 
-      selectedDate.setHours(0, 0, 0, 0);
+      const selectedDateKey = formatScheduleDateKey(selectedScheduleDate);
 
-      const weekdays = [
-        "일요일",
-        "월요일",
-        "화요일",
-        "수요일",
-        "목요일",
-        "금요일",
-        "토요일",
-      ];
+      if (selectedDateKey) {
+        const parts = selectedDateKey.split("-");
 
-      const weekday = weekdays[selectedDate.getDay()];
+        const year = Number(parts[0]);
+        const month = Number(parts[1]);
+        const day = Number(parts[2]);
 
-      emptyMessage.textContent = `${weekday} 출강 일정 없음`;
+        const selectedDate = new Date(year, month - 1, day);
+
+        if (!isNaN(selectedDate.getTime())) {
+          const weekdays = [
+            "일요일",
+            "월요일",
+            "화요일",
+            "수요일",
+            "목요일",
+            "금요일",
+            "토요일",
+          ];
+
+          weekday = weekdays[selectedDate.getDay()];
+        }
+      }
+
+      if (weekday) {
+        emptyMessage.textContent = `${weekday} 출강 일정 없음`;
+      } else {
+        emptyMessage.textContent = "출강 일정 없음";
+      }
+
+      emptyMessage.style.display = "block";
 
       emptyMessage.style.display = "block";
     }
@@ -3292,25 +3287,6 @@ function showReportSubmitLoading(message) {
 }
 
 // ============================================================
-// 보고서 제출 공통 전체 화면 로딩 제거
-// ============================================================
-
-function hideReportSubmitLoading() {
-  reportSubmitLoading = false;
-
-  // 브라우저 이탈 경고 해제
-  window.__reportSubmitInProgress = false;
-
-  const overlay = document.getElementById("reportSubmitLoadingOverlay");
-
-  if (overlay) {
-    overlay.remove();
-  }
-
-  document.body.style.overflow = "";
-}
-
-// ============================================================
 // 제출 중 페이지 이탈 경고
 // ============================================================
 
@@ -3369,16 +3345,26 @@ function updateDateArrowState() {
     return;
   }
 
+  // 현재 선택 날짜는 반드시 selectedScheduleDate 사용
   const current = new Date(selectedScheduleDate);
+
+  if (isNaN(current.getTime())) {
+    return;
+  }
+
   current.setHours(0, 0, 0, 0);
 
+  // 오늘
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   // 이번 주 일요일
   const dayOfWeek = today.getDay();
+
   const sunday = new Date(today);
+
   sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
+
   sunday.setHours(0, 0, 0, 0);
 
   const canGoPrevious = current > today;
