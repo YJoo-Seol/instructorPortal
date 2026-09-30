@@ -30,12 +30,37 @@
 }
 
 .portal-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-weight: 700;
   color: #406093;
   text-align: center;
   white-space: nowrap;
 }
+.new-report-badge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #dc2626;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 22px;
+}
 
+.new-report-badge:hover {
+  background: #b91c1c;
+}
 .instructor-number {
   margin: 10px 0;
   font-size: 13px;
@@ -196,9 +221,15 @@
 }
 
 .dispatch-title {
-  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  width: 100%;
+  font-size: 18px;
   font-weight: 700;
   color: #406093;
+  text-align: left;
 }
 
 .dispatch-date {
@@ -936,102 +967,37 @@
   }
 }
 
-/* ============================================================
-   새로 제출된 보고 배지
-   - 주강사 종료보고
-   - 보조강사 시작보고
-   - 보조강사 종료보고
-   ============================================================ */
+/* =========================================================
+   운영진 대시보드 만족도 배지
+   ========================================================= */
 
-.admin-title-with-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 테마 색상에 맞춘 새 보고 배지 */
-.new-report-badge {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  padding: 0;
-  margin: 0;
-
-  border: none;
-  border-radius: 50%;
-
-  background: #4c8ce4;
-  color: #fff;
-
-  display: flex;
+.satisfaction-badge {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-
-  font-size: 12px;
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 14px;
   font-weight: 700;
-  line-height: 1;
-
-  cursor: pointer;
-
-  box-sizing: border-box;
-
-  transition:
-    transform 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.new-report-badge:hover {
-  background: #406093;
-  transform: scale(1.05);
-}
-
-.new-report-badge:active {
-  transform: scale(0.95);
-}
-
-#newReportBadgeCount {
-  display: block;
-  line-height: 1;
+  line-height: 1.3;
   white-space: nowrap;
 }
 
-/* 10건 이상이면 숫자가 들어갈 수 있도록 살짝 넓게 */
-.new-report-badge.has-many {
-  min-width: 30px;
-  width: auto;
-  padding: 0 7px;
-  border-radius: 999px;
-}
-
-.date-nav-arrow.disabled {
-  opacity: 0.3;
-  cursor: default;
-  pointer-events: none;
-}
-
-.card-top .satisfaction-badge {
-  flex-shrink: 0;
-}
-
-.satisfaction-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-}
-
+/* 만족도 QR */
 .satisfaction-qr {
-  color: #406093;
-  background: #eef3fa;
-  animation: satisfaction-alert 1.2s infinite;
+  background: #eef6ff;
+  color: #3574b8;
+  border: 1px solid #cfe4f8;
+  animation: satisfaction-alert 1.2s ease-in-out infinite;
 }
 
+/* 만족도 QR + 출강부 */
 .satisfaction-qr-book {
-  color: #d32f2f;
-  background: #fff0f0;
-  animation: satisfaction-alert 1.2s infinite;
+  background: #fff4e5;
+  color: #c56b00;
+  border: 1px solid #f3d29b;
+  animation: satisfaction-alert 1.2s ease-in-out infinite;
 }
 
 @keyframes satisfaction-alert {

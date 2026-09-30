@@ -1022,10 +1022,10 @@ function createScheduleCard(schedule) {
 
   card.innerHTML = `
     <div class="dispatch-header">
-      <div class="dispatch-title">
-        ${satisfactionBadge}
-        ${facilityName}
-      </div>
+     <div class="dispatch-title">
+  <span class="facility-name">${facilityName}</span>
+  ${satisfactionBadge}
+</div>
     </div>
 
     <div class="dispatch-info">
@@ -1601,7 +1601,7 @@ function getSatisfactionBadgeHtml(satisfaction) {
   if (value === "QR") {
     return `
       <span class="satisfaction-badge satisfaction-qr">
-        📝만족도 진행
+        📝 만족도 진행
       </span>
     `;
   }
@@ -1609,7 +1609,7 @@ function getSatisfactionBadgeHtml(satisfaction) {
   if (value === "QR+출강부") {
     return `
       <span class="satisfaction-badge satisfaction-qr-book">
-        🚨만족도 진행 및 출강부 회수
+        🚨 만족도 진행 및 출강부 회수
       </span>
     `;
   }
