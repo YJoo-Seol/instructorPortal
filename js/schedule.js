@@ -560,7 +560,7 @@ function getSatisfactionBadgeHtml(satisfaction) {
 }
 
 // ========================================
-// PC 테이블
+// PC 일정 렌더링
 // ========================================
 
 function renderDesktopTable(schedules, role) {
@@ -568,8 +568,11 @@ function renderDesktopTable(schedules, role) {
 
   console.log("[PC 일정 렌더링]", {
     tbody: !!tbody,
+
     scheduleCount: Array.isArray(schedules) ? schedules.length : 0,
+
     schedules: schedules,
+
     role: role,
   });
 
@@ -577,6 +580,7 @@ function renderDesktopTable(schedules, role) {
     console.error(
       "[PC 일정 렌더링 실패] #scheduleTableBody를 찾을 수 없습니다.",
     );
+
     return;
   }
 
@@ -593,64 +597,307 @@ function renderDesktopTable(schedules, role) {
 
     const satisfactionBadge = getSatisfactionBadgeHtml(schedule.satisfaction);
 
+    // --------------------------------------------------------
     // 반드시 개별 일정의 role 우선
+    // --------------------------------------------------------
+
     const scheduleRole = normalizeRole(schedule.role || role || "");
 
+    // --------------------------------------------------------
+    // 종료보고 제출기한 경고
+    //
+    // 수업일이 오늘보다 이전이고
+    // 종료보고가 아직 제출되지 않은 경우
+    // --------------------------------------------------------
+
+    const scheduleDate = parseDateValue(schedule.date);
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    let showDeadlineWarning = false;
+
+    if (scheduleDate) {
+      scheduleDate.setHours(0, 0, 0, 0);
+
+      const endReportSubmitted =
+        schedule.myReport && schedule.myReport.end === true;
+
+      showDeadlineWarning = scheduleDate < today && !endReportSubmitted;
+    }
+
     tr.innerHTML = `
-      <td>
-        <div class="desktop-facility-info">
-          ${satisfactionBadge}
-          <strong class="desktop-facility-name">
-            ${escapeHtml(schedule.facilityName || "-")}
-          </strong>
-        </div>
-      </td>
 
-      <td>
-        ${escapeHtml(schedule.address || "-")}
-      </td>
+        <td>
 
-      <td>
-        ${escapeHtml(schedule.time || "-")}
-      </td>
+          <div class="desktop-facility-info">
 
-      <td>
-        ${escapeHtml(schedule.hours || "-")}
-      </td>
+            ${satisfactionBadge}
 
-      <td>
-        ${escapeHtml(schedule.target || "-")}
-      </td>
+            <strong class="desktop-facility-name">
 
-      <td>
-        <div class="report-buttons">
+              ${escapeHtml(schedule.facilityName || "-")}
+
+            </strong>
+
+          </div>
+
+        </td>
+
+
+        <td>
+
+          ${escapeHtml(schedule.address || "-")}
+
+        </td>
+
+
+        <td>
+
+          ${escapeHtml(schedule.time || "-")}
+
+        </td>
+
+
+        <td>
+
+          ${escapeHtml(schedule.hours || "-")}
+
+        </td>
+
+
+        <td>
+
+          ${escapeHtml(schedule.target || "-")}
+
+        </td>
+
+
+        <td>
+
+          <div class="report-buttons">
+
+            ${
+              scheduleRole === "주강사"
+                ? createReportButton("end", schedule, schedule.myReport?.end)
+                : ""
+            }
+
+
+            ${
+              scheduleRole === "보조강사"
+                ? renderAssistantStartReport(schedule, index, "desktop")
+                : ""
+            }
+
+
+            ${
+              scheduleRole === "보조강사"
+                ? createReportButton("end", schedule, schedule.myReport?.end)
+                : ""
+            }
+
+          </div>
+
 
           ${
-            scheduleRole === "주강사"
-              ? createReportButton("end", schedule, schedule.myReport?.end)
+            showDeadlineWarning
+              ? `
+                <div class="end-report-deadline-warning">
+                  *종료보고 제출 기한 엄수바랍니다.
+                </div>
+              `
               : ""
           }
 
-          ${
-            scheduleRole === "보조강사"
-              ? renderAssistantStartReport(schedule, index, "desktop")
-              : ""
-          }
+        </td>
 
-          ${
-            scheduleRole === "보조강사"
-              ? createReportButton("end", schedule, schedule.myReport?.end)
-              : ""
-          }
-
-        </div>
-      </td>
-    `;
+      `;
 
     tbody.appendChild(tr);
   });
 
   renderDesktopStartReportArea();
+}
+
+// ========================================
+// 모바일 카드
+// ========================================
+
+function renderMobileCards(schedules, role) {
+  const wrap = document.getElementById("scheduleCardWrap");
+
+  if (!wrap) {
+    return;
+  }
+
+  wrap.innerHTML = "";
+
+  schedules.forEach((schedule, index) => {
+    const card = document.createElement("div");
+
+    card.className = "schedule-card";
+
+    const satisfactionBadge = getSatisfactionBadgeHtml(schedule.satisfaction);
+
+    const scheduleRole = normalizeRole(schedule.role || role || "");
+
+    // --------------------------------------------------------
+    // 종료보고 제출기한 경고
+    // --------------------------------------------------------
+
+    const scheduleDate = parseDateValue(schedule.date);
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    let showDeadlineWarning = false;
+
+    if (scheduleDate) {
+      scheduleDate.setHours(0, 0, 0, 0);
+
+      const endReportSubmitted =
+        schedule.myReport && schedule.myReport.end === true;
+
+      showDeadlineWarning = scheduleDate < today && !endReportSubmitted;
+    }
+
+    card.innerHTML = `
+
+        <div class="card-top satisfaction-badge">
+
+          ${satisfactionBadge}
+
+        </div>
+
+
+        <div class="card-title">
+
+          ${escapeHtml(schedule.schedule || "-")}
+
+        </div>
+
+
+        <div class="card-info">
+
+          <div class="info-row">
+
+            <span class="info-label">
+              주소
+            </span>
+
+            <span class="info-value">
+
+              ${escapeHtml(schedule.address || "-")}
+
+            </span>
+
+          </div>
+
+
+          <div class="info-row">
+
+            <span class="info-label">
+              시간
+            </span>
+
+            <span class="info-value">
+
+              ${escapeHtml(schedule.time || "-")}
+
+            </span>
+
+          </div>
+
+
+          <div class="info-row">
+
+            <span class="info-label">
+              차시
+            </span>
+
+            <span class="info-value">
+
+              ${escapeHtml(schedule.hours || "-")}
+
+            </span>
+
+          </div>
+
+
+          <div class="info-row">
+
+            <span class="info-label">
+              대상
+            </span>
+
+            <span class="info-value">
+
+              ${escapeHtml(schedule.target || "-")}
+
+            </span>
+
+          </div>
+
+        </div>
+
+
+        <div class="card-actions">
+
+          <div class="action-section">
+
+            <div class="report-buttons">
+
+              ${
+                scheduleRole === "주강사"
+                  ? createReportButton("end", schedule, schedule.myReport?.end)
+                  : ""
+              }
+
+
+              ${
+                scheduleRole === "보조강사"
+                  ? renderAssistantStartReport(schedule, index, "mobile")
+                  : ""
+              }
+
+
+              ${
+                scheduleRole === "보조강사"
+                  ? createReportButton("end", schedule, schedule.myReport?.end)
+                  : ""
+              }
+
+            </div>
+
+
+            ${
+              showDeadlineWarning
+                ? `
+                  <div class="end-report-deadline-warning">
+                    *종료보고 제출 기한 엄수바랍니다.
+                  </div>
+                `
+                : ""
+            }
+
+
+            ${
+              scheduleRole === "보조강사"
+                ? renderAssistantStartForm(index, "mobile")
+                : ""
+            }
+
+          </div>
+
+        </div>
+
+      `;
+
+    wrap.appendChild(card);
+  });
 }
 
 // ========================================
@@ -670,130 +917,6 @@ function renderDesktopStartReportArea() {
       tableWrap.parentNode.insertBefore(area, tableWrap.nextSibling);
     }
   }
-}
-
-// ========================================
-// 모바일 카드
-// ========================================
-
-function renderMobileCards(schedules, role) {
-  const wrap = document.getElementById("scheduleCardWrap");
-
-  if (!wrap) return;
-
-  wrap.innerHTML = "";
-
-  schedules.forEach((schedule, index) => {
-    const card = document.createElement("div");
-
-    card.className = "schedule-card";
-
-    const satisfactionBadge = getSatisfactionBadgeHtml(schedule.satisfaction);
-
-    const scheduleRole = normalizeRole(schedule.role || role || "");
-
-    card.innerHTML = `
-
-      <div class="card-top satisfaction-badge">
-        ${satisfactionBadge}
-      </div>
-
-      <div class="card-title">
-        ${escapeHtml(schedule.schedule || "-")}
-      </div>
-
-      <div class="card-info">
-
-        <div class="info-row">
-
-          <span class="info-label">
-            주소
-          </span>
-
-          <span class="info-value">
-            ${escapeHtml(schedule.address || "-")}
-          </span>
-
-        </div>
-
-        <div class="info-row">
-
-          <span class="info-label">
-            시간
-          </span>
-
-          <span class="info-value">
-            ${escapeHtml(schedule.time || "-")}
-          </span>
-
-        </div>
-
-        <div class="info-row">
-
-          <span class="info-label">
-            차시
-          </span>
-
-          <span class="info-value">
-            ${escapeHtml(schedule.hours || "-")}
-          </span>
-
-        </div>
-
-        <div class="info-row">
-
-          <span class="info-label">
-            대상
-          </span>
-
-          <span class="info-value">
-            ${escapeHtml(schedule.target || "-")}
-          </span>
-
-        </div>
-
-      </div>
-
-      <div class="card-actions">
-
-        <div class="action-section">
-
-          <div class="report-buttons">
-
-            ${
-              scheduleRole === "주강사"
-                ? createReportButton("end", schedule, schedule.myReport?.end)
-                : ""
-            }
-
-            ${
-              scheduleRole === "보조강사"
-                ? renderAssistantStartReport(schedule, index, "mobile")
-                : ""
-            }
-
-            ${
-              scheduleRole === "보조강사"
-                ? createReportButton("end", schedule, schedule.myReport?.end)
-                : ""
-            }
-
-          </div>
-
-          ${
-            scheduleRole === "보조강사"
-              ? renderAssistantStartForm(index, "mobile")
-              : ""
-          }
-
-        </div>
-
-      </div>
-
-    `;
-
-    wrap.appendChild(card);
-  });
 }
 
 // ========================================
@@ -2996,44 +3119,83 @@ function updateDateDisplay() {
 
 // ============================================================
 // 이전 / 다음 날짜
+//
 // HTML:
 // onclick="moveDate(-1)"
 // onclick="moveDate(1)"
 //
-// ※ 오늘 ~ 이번 주 일요일까지만 이동 가능
+// ※ 이번 주 월요일 ~ 일요일까지만 이동 가능
 // ============================================================
 
 function moveDate(offset) {
   const current = new Date(selectedScheduleDate);
+
   current.setHours(0, 0, 0, 0);
 
+  // ----------------------------------------------------------
+  // 오늘 날짜
+  // ----------------------------------------------------------
+
   const today = new Date();
+
   today.setHours(0, 0, 0, 0);
 
-  // 이번 주 일요일
+  // ----------------------------------------------------------
+  // 오늘이 포함된 주의 월요일
+  // ----------------------------------------------------------
+
   const dayOfWeek = today.getDay();
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
+
+  const monday = new Date(today);
+
+  monday.setDate(today.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
+
+  monday.setHours(0, 0, 0, 0);
+
+  // ----------------------------------------------------------
+  // 오늘이 포함된 주의 일요일
+  // ----------------------------------------------------------
+
+  const sunday = new Date(monday);
+
+  sunday.setDate(monday.getDate() + 6);
+
   sunday.setHours(0, 0, 0, 0);
 
+  // ----------------------------------------------------------
+  // 이동할 날짜
+  // ----------------------------------------------------------
+
   const targetDate = new Date(current);
-  targetDate.setDate(targetDate.getDate() + offset);
+
+  targetDate.setDate(current.getDate() + offset);
+
   targetDate.setHours(0, 0, 0, 0);
 
-  // 오늘 이전 / 이번 주 일요일 이후 이동 차단
-  if (targetDate < today || targetDate > sunday) {
+  // ----------------------------------------------------------
+  // 이번 주 범위 밖이면 이동 차단
+  // ----------------------------------------------------------
+
+  if (targetDate < monday || targetDate > sunday) {
     return;
   }
+
+  // ----------------------------------------------------------
+  // 정상 이동
+  // ----------------------------------------------------------
 
   selectedScheduleDate = targetDate;
 
   updateDateDisplay();
+
   updateDateArrowState();
 
-  // 해당 날짜 일정 다시 조회/표시
+  // ----------------------------------------------------------
+  // 해당 날짜 일정 다시 표시
+  // ----------------------------------------------------------
+
   renderFilteredSchedules();
 }
-
 // ============================================================
 // 날짜 클릭 → 오늘
 // HTML:
@@ -3337,15 +3499,27 @@ window.addEventListener("beforeunload", function (event) {
     "보고서 제출이 완료되지 않았습니다. 페이지를 나가시겠습니까?";
 });
 
+// ============================================================
+// 날짜 이동 화살표 활성화 / 비활성화
+// ============================================================
+
+// ============================================================
+// 날짜 이동 화살표 활성화 / 비활성화
+// ============================================================
+
 function updateDateArrowState() {
   const prevArrow = document.getElementById("prevDateArrow");
+
   const nextArrow = document.getElementById("nextDateArrow");
 
   if (!prevArrow && !nextArrow) {
     return;
   }
 
-  // 현재 선택 날짜는 반드시 selectedScheduleDate 사용
+  // ----------------------------------------------------------
+  // 현재 선택 날짜
+  // ----------------------------------------------------------
+
   const current = new Date(selectedScheduleDate);
 
   if (isNaN(current.getTime())) {
@@ -3354,21 +3528,43 @@ function updateDateArrowState() {
 
   current.setHours(0, 0, 0, 0);
 
-  // 오늘
+  // ----------------------------------------------------------
+  // 오늘이 포함된 주의 월요일
+  // ----------------------------------------------------------
+
   const today = new Date();
+
   today.setHours(0, 0, 0, 0);
 
-  // 이번 주 일요일
   const dayOfWeek = today.getDay();
 
-  const sunday = new Date(today);
+  const monday = new Date(today);
 
-  sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
+  monday.setDate(today.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
+
+  monday.setHours(0, 0, 0, 0);
+
+  // ----------------------------------------------------------
+  // 오늘이 포함된 주의 일요일
+  // ----------------------------------------------------------
+
+  const sunday = new Date(monday);
+
+  sunday.setDate(monday.getDate() + 6);
 
   sunday.setHours(0, 0, 0, 0);
 
-  const canGoPrevious = current > today;
+  // ----------------------------------------------------------
+  // 이동 가능 여부
+  // ----------------------------------------------------------
+
+  const canGoPrevious = current > monday;
+
   const canGoNext = current < sunday;
+
+  // ----------------------------------------------------------
+  // 회색 비활성 표시
+  // ----------------------------------------------------------
 
   if (prevArrow) {
     prevArrow.classList.toggle("disabled", !canGoPrevious);
@@ -3377,4 +3573,35 @@ function updateDateArrowState() {
   if (nextArrow) {
     nextArrow.classList.toggle("disabled", !canGoNext);
   }
+}
+
+// ============================================================
+// 종료보고 제출기한 경고 여부
+// ============================================================
+
+function shouldShowEndReportDeadlineWarning(schedule) {
+  if (!schedule) {
+    return false;
+  }
+
+  // 종료보고가 이미 완료된 경우
+  if (schedule.endReport === true || schedule.endReport === "완료") {
+    return false;
+  }
+
+  const scheduleDate = parseDateValue(schedule.date);
+
+  if (!scheduleDate) {
+    return false;
+  }
+
+  scheduleDate.setHours(0, 0, 0, 0);
+
+  const today = new Date();
+
+  today.setHours(0, 0, 0, 0);
+
+  // 수업일이 오늘보다 이전이면
+  // 종료보고 제출기한 경고
+  return scheduleDate < today;
 }

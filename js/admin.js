@@ -607,7 +607,7 @@ function updateAdminDateDisplay() {
   display.textContent = `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")} (${weekday})`;
 
   // --------------------------------------------------------
-  // 선택 날짜 ~ 해당 주 일요일
+  // 오늘이 포함된 주의 월요일 ~ 일요일
   // --------------------------------------------------------
 
   if (rangeDisplay) {
@@ -617,9 +617,21 @@ function updateAdminDateDisplay() {
 
     const dayOfWeek = current.getDay();
 
-    const sunday = new Date(current);
+    const monday = new Date(current);
 
-    sunday.setDate(current.getDate() + (dayOfWeek === 0 ? 0 : 7 - dayOfWeek));
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+
+    monday.setDate(current.getDate() + mondayOffset);
+
+    const sunday = new Date(monday);
+
+    sunday.setDate(monday.getDate() + 6);
+
+    const mondayMonth = monday.getMonth() + 1;
+
+    const mondayDay = monday.getDate();
+
+    const mondayWeekday = weekdays[monday.getDay()];
 
     const sundayMonth = sunday.getMonth() + 1;
 
@@ -627,14 +639,9 @@ function updateAdminDateDisplay() {
 
     const sundayWeekday = weekdays[sunday.getDay()];
 
-    const currentMonth = current.getMonth() + 1;
-
-    const currentDay = current.getDate();
-
-    const currentWeekday = weekdays[current.getDay()];
-
-    rangeDisplay.textContent = `${currentMonth}월 ${currentDay}일(${currentWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(${sundayWeekday})까지 조회 가능`;
+    rangeDisplay.textContent = `${mondayMonth}월 ${mondayDay}일(${mondayWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(${sundayWeekday})까지 조회 가능`;
   }
+
   updateAdminDateArrowState();
 }
 
@@ -646,28 +653,40 @@ function moveDate(offset) {
   console.log("[운영진 날짜 이동 실행]:", offset);
 
   const current = new Date(selectedAdminDate);
+
   current.setHours(0, 0, 0, 0);
 
-  // ----------------------------------------------------------
+  // --------------------------------------------------------
   // 오늘 날짜
-  // ----------------------------------------------------------
+  // --------------------------------------------------------
 
   const today = new Date();
+
   today.setHours(0, 0, 0, 0);
 
-  // ----------------------------------------------------------
-  // 오늘이 포함된 주의 일요일 계산
-  // ----------------------------------------------------------
+  // --------------------------------------------------------
+  // 오늘이 포함된 주의 월요일 / 일요일
+  // --------------------------------------------------------
 
   const dayOfWeek = today.getDay();
 
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
+  const monday = new Date(today);
+
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+
+  monday.setDate(today.getDate() + mondayOffset);
+
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+
+  sunday.setDate(monday.getDate() + 6);
+
   sunday.setHours(0, 0, 0, 0);
 
-  // ----------------------------------------------------------
-  // 이동할 날짜 계산
-  // ----------------------------------------------------------
+  // --------------------------------------------------------
+  // 이동할 날짜
+  // --------------------------------------------------------
 
   const newDate = new Date(current);
 
@@ -675,42 +694,45 @@ function moveDate(offset) {
 
   newDate.setHours(0, 0, 0, 0);
 
-  // ----------------------------------------------------------
-  // 조회 가능 범위 밖이면 이동 차단
+  // --------------------------------------------------------
+  // 이번 주 범위 밖이면 이동 차단
   //
-  // 오늘 이전 ❌
-  // 이번 주 일요일 이후 ❌
-  // ----------------------------------------------------------
+  // 월요일 이전 ❌
+  // 일요일 이후 ❌
+  // --------------------------------------------------------
 
-  if (newDate < today || newDate > sunday) {
-    console.log("[운영진 날짜 이동] 조회 가능 범위를 벗어나므로 이동 차단:", {
-      현재날짜: formatAdminDateKey(current),
+  if (newDate < monday || newDate > sunday) {
+    console.log(
+      "[운영진 날짜 이동] 이번 주 조회 범위를 벗어나므로 이동 차단:",
+      {
+        현재날짜: formatAdminDateKey(current),
 
-      이동날짜: formatAdminDateKey(newDate),
+        이동날짜: formatAdminDateKey(newDate),
 
-      조회시작일: formatAdminDateKey(today),
+        조회시작일: formatAdminDateKey(monday),
 
-      조회종료일: formatAdminDateKey(sunday),
-    });
+        조회종료일: formatAdminDateKey(sunday),
+      },
+    );
 
     return;
   }
 
-  // ----------------------------------------------------------
+  // --------------------------------------------------------
   // 정상 이동
-  // ----------------------------------------------------------
+  // --------------------------------------------------------
 
   selectedAdminDate = newDate;
 
   updateAdminDateDisplay();
 
-  // ----------------------------------------------------------
-  // 날짜가 변경되면 현재 주간 데이터에서 해당 날짜만 필터링
-  // ----------------------------------------------------------
+  // --------------------------------------------------------
+  // 같은 주간 데이터에서
+  // 선택 날짜만 다시 필터링
+  // --------------------------------------------------------
 
   renderFilteredAdminSchedules();
 }
-
 // ==========================================================
 // 오늘 날짜로 이동
 // ==========================================================
@@ -1558,33 +1580,71 @@ function detectNewAdminReports(schedules, isInitialState) {
 // ==========================================================
 // 날짜 이동 화살표 활성화 / 비활성화
 // ==========================================================
+
 function updateAdminDateArrowState() {
   const prevArrow = document.getElementById("prevDateArrow");
+
   const nextArrow = document.getElementById("nextDateArrow");
 
   if (!prevArrow && !nextArrow) {
     return;
   }
 
-  const current = new Date(selectedAdminDate);
-  current.setHours(0, 0, 0, 0);
+  // --------------------------------------------------------
+  // 오늘이 포함된 주의 월요일 ~ 일요일
+  // --------------------------------------------------------
 
   const today = new Date();
+
   today.setHours(0, 0, 0, 0);
 
-  // 오늘이 포함된 주의 일요일
   const dayOfWeek = today.getDay();
 
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() + ((7 - dayOfWeek) % 7));
+  const monday = new Date(today);
+
+  monday.setDate(today.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
+
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+
+  sunday.setDate(monday.getDate() + 6);
+
   sunday.setHours(0, 0, 0, 0);
 
-  const canGoPrevious = current > today;
+  // --------------------------------------------------------
+  // 현재 선택 날짜
+  // --------------------------------------------------------
+
+  const current = new Date(selectedAdminDate);
+
+  if (isNaN(current.getTime())) {
+    return;
+  }
+
+  current.setHours(0, 0, 0, 0);
+
+  // --------------------------------------------------------
+  // 이동 가능 여부
+  // --------------------------------------------------------
+
+  const canGoPrevious = current > monday;
+
   const canGoNext = current < sunday;
+
+  // --------------------------------------------------------
+  // 이전 화살표
+  // 월요일이면 회색
+  // --------------------------------------------------------
 
   if (prevArrow) {
     prevArrow.classList.toggle("disabled", !canGoPrevious);
   }
+
+  // --------------------------------------------------------
+  // 다음 화살표
+  // 일요일이면 회색
+  // --------------------------------------------------------
 
   if (nextArrow) {
     nextArrow.classList.toggle("disabled", !canGoNext);

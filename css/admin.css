@@ -1010,3 +1010,8 @@
     opacity: 0.35;
   }
 }
+
+.date-nav-arrow.disabled {
+  opacity: 0.35;
+  color: #999;
+}
