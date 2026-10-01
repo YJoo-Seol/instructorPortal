@@ -2723,6 +2723,7 @@ async function submitAssistantEndReport(index, device) {
       pageId: schedule.pageId || "",
 
       date: schedule.date || "",
+
       endDate: schedule.endDate,
 
       facilityName: schedule.facilityName || "",
