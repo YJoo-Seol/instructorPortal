@@ -996,7 +996,7 @@ function renderAssistantStartForm(index, device = "mobile") {
           type="file"
           id="${photoInputId}"
           class="start-photo-input"
-          accept="image/*"
+          accept="image/*,.heic,.heif"
           onchange="handleStartPhotoSelect(${index}, '${device}', this)"
         />
       </div>
@@ -1415,7 +1415,7 @@ function renderMainTeacherEndReportForm(index, device) {
           <input
             type="file"
             id="${prefix}_photo"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             onchange="handleSinglePhotoSelect('${prefix}_preview', '${prefix}_previewImage', this)"
           />
           <div
@@ -1459,34 +1459,129 @@ function renderMainTeacherEndReportForm(index, device) {
 // 단일 파일 미리보기 (공용)
 // ========================================
 
-function handleSinglePhotoSelect(previewContainerId, previewImageId, input) {
+async function handleSinglePhotoSelect(
+  previewContainerId,
+  previewImageId,
+  input,
+) {
   const preview = document.getElementById(previewContainerId);
   const previewImage = document.getElementById(previewImageId);
 
-  if (!input || !input.files || input.files.length === 0) {
-    if (previewImage) previewImage.src = "";
-    if (preview) preview.style.display = "none";
+  if (!input) {
     return;
   }
 
-  const file = input.files[0];
-  if (!preview || !previewImage) return;
+  // 이전 변환/미리보기 데이터 초기화
+  input.__preparedFile = null;
 
-  if (file.type.startsWith("image/")) {
-    const reader = new FileReader();
-    reader.onload = function (event) {
-      previewImage.src = event.target.result;
-      preview.style.display = "flex";
-    };
-    reader.readAsDataURL(file);
-  } else if (file.type === "application/pdf") {
-    previewImage.src = "";
-    preview.style.display = "none";
-  } else {
+  if (input.__previewObjectUrl) {
+    try {
+      URL.revokeObjectURL(input.__previewObjectUrl);
+    } catch (error) {
+      console.warn("기존 미리보기 URL 해제 실패:", error);
+    }
+
+    input.__previewObjectUrl = null;
+  }
+
+  if (!input.files || input.files.length === 0) {
+    if (previewImage) {
+      previewImage.src = "";
+    }
+
+    if (preview) {
+      preview.style.display = "none";
+    }
+
+    return;
+  }
+
+  const originalFile = input.files[0];
+
+  if (!preview || !previewImage) {
+    return;
+  }
+
+  if (!isImageFile(originalFile) && !isPdfFile(originalFile)) {
     alert("이미지 파일 또는 PDF 파일만 첨부할 수 있습니다.");
+
     input.value = "";
+    input.__preparedFile = null;
+
     previewImage.src = "";
     preview.style.display = "none";
+
+    return;
+  }
+
+  try {
+    // HEIC / HEIF면 실제 JPEG로 변환
+    const preparedFile = await prepareUploadFile(originalFile);
+
+    input.__preparedFile = preparedFile;
+
+    // PDF는 기존처럼 미리보기 없음
+    if (isPdfFile(preparedFile)) {
+      previewImage.src = "";
+      preview.style.display = "none";
+
+      return;
+    }
+
+    if (!isImageFile(preparedFile)) {
+      throw new Error("지원하지 않는 이미지 형식입니다.");
+    }
+
+    const objectUrl = URL.createObjectURL(preparedFile);
+
+    input.__previewObjectUrl = objectUrl;
+
+    previewImage.onload = function () {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch (error) {
+        console.warn("미리보기 URL 해제 실패:", error);
+      }
+
+      if (input.__previewObjectUrl === objectUrl) {
+        input.__previewObjectUrl = null;
+      }
+    };
+
+    previewImage.onerror = function () {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch (error) {
+        console.warn("미리보기 URL 해제 실패:", error);
+      }
+
+      if (input.__previewObjectUrl === objectUrl) {
+        input.__previewObjectUrl = null;
+      }
+
+      input.__preparedFile = null;
+      previewImage.src = "";
+      preview.style.display = "none";
+
+      alert(
+        `"${originalFile.name}" 사진을 미리보기할 수 없습니다.\n\n사진을 다시 선택해주세요.`,
+      );
+    };
+
+    previewImage.src = objectUrl;
+    preview.style.display = "flex";
+  } catch (error) {
+    console.error("단일 파일 처리 오류:", error);
+
+    input.value = "";
+    input.__preparedFile = null;
+
+    previewImage.src = "";
+    preview.style.display = "none";
+
+    alert(
+      error.message || `"${originalFile.name}" 사진을 처리하지 못했습니다.`,
+    );
   }
 }
 
@@ -1577,7 +1672,7 @@ async function submitMainTeacherEndReport(index, device) {
       return;
     }
 
-    const file = photoInput.files[0];
+    const originalFile = photoInput.files[0];
 
     if (reportSubmitLoading) {
       return;
@@ -1586,6 +1681,9 @@ async function submitMainTeacherEndReport(index, device) {
     showReportSubmitLoading("주강사 종료보고를 제출하고 있습니다.");
 
     const base64Start = performance.now();
+
+    const file =
+      photoInput.__preparedFile || (await prepareUploadFile(originalFile));
 
     const base64 = await fileToBase64(file);
 
@@ -1698,15 +1796,17 @@ async function submitMainTeacherEndReport(index, device) {
 // 시작보고 사진 선택
 // ========================================
 
-function handleStartPhotoSelect(index, device, input) {
+async function handleStartPhotoSelect(index, device, input) {
   const submitId =
     device === "desktop"
       ? `desktopStartSubmit_${index}`
       : `assistantStartSubmit_mobile_${index}`;
+
   const previewId =
     device === "desktop"
       ? `desktopStartPreview_${index}`
       : `assistantStartPreview_mobile_${index}`;
+
   const previewImageId =
     device === "desktop"
       ? `desktopStartPreviewImage_${index}`
@@ -1716,7 +1816,21 @@ function handleStartPhotoSelect(index, device, input) {
   const preview = document.getElementById(previewId);
   const previewImage = document.getElementById(previewImageId);
 
-  if (!submitButton || !preview || !previewImage) return;
+  if (!submitButton || !preview || !previewImage || !input) {
+    return;
+  }
+
+  input.__preparedFile = null;
+
+  if (input.__previewObjectUrl) {
+    try {
+      URL.revokeObjectURL(input.__previewObjectUrl);
+    } catch (error) {
+      console.warn("기존 시작보고 미리보기 URL 해제 실패:", error);
+    }
+
+    input.__previewObjectUrl = null;
+  }
 
   if (!input.files || input.files.length === 0) {
     previewImage.src = "";
@@ -1725,24 +1839,86 @@ function handleStartPhotoSelect(index, device, input) {
     return;
   }
 
-  const file = input.files[0];
-  if (!file.type.startsWith("image/")) {
+  const originalFile = input.files[0];
+
+  if (!isImageFile(originalFile)) {
     alert("이미지 파일만 선택할 수 있습니다.");
+
     input.value = "";
+    input.__preparedFile = null;
+
     previewImage.src = "";
     preview.style.display = "none";
     submitButton.disabled = true;
+
     return;
   }
 
-  const objectUrl = URL.createObjectURL(file);
-  previewImage.onload = function () {
-    URL.revokeObjectURL(objectUrl);
-  };
-  previewImage.src = objectUrl;
+  submitButton.disabled = true;
+  preview.style.display = "none";
 
-  preview.style.display = "flex";
-  submitButton.disabled = false;
+  try {
+    const preparedFile = await prepareUploadFile(originalFile);
+
+    if (!isImageFile(preparedFile)) {
+      throw new Error("이미지 파일로 변환되지 않았습니다.");
+    }
+
+    input.__preparedFile = preparedFile;
+
+    const objectUrl = URL.createObjectURL(preparedFile);
+
+    input.__previewObjectUrl = objectUrl;
+
+    previewImage.onload = function () {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch (error) {
+        console.warn("시작보고 미리보기 URL 해제 실패:", error);
+      }
+
+      if (input.__previewObjectUrl === objectUrl) {
+        input.__previewObjectUrl = null;
+      }
+    };
+
+    previewImage.onerror = function () {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch (error) {
+        console.warn("시작보고 미리보기 URL 해제 실패:", error);
+      }
+
+      input.__previewObjectUrl = null;
+      input.__preparedFile = null;
+
+      previewImage.src = "";
+      preview.style.display = "none";
+      submitButton.disabled = true;
+
+      alert(
+        `"${originalFile.name}" 사진을 미리보기할 수 없습니다.\n\n사진을 다시 선택해주세요.`,
+      );
+    };
+
+    previewImage.src = objectUrl;
+    preview.style.display = "flex";
+
+    submitButton.disabled = false;
+  } catch (error) {
+    console.error("시작보고 사진 처리 오류:", error);
+
+    input.value = "";
+    input.__preparedFile = null;
+
+    previewImage.src = "";
+    preview.style.display = "none";
+    submitButton.disabled = true;
+
+    alert(
+      error.message || `"${originalFile.name}" 사진을 처리하지 못했습니다.`,
+    );
+  }
 }
 
 // ==========================================================
@@ -1794,9 +1970,9 @@ async function submitAssistantStartReport(index, device) {
     return;
   }
 
-  const file = photoInput.files[0];
+  const originalFile = photoInput.files[0];
 
-  if (!file.type.startsWith("image/")) {
+  if (!isImageFile(originalFile)) {
     alert("이미지 파일만 선택할 수 있습니다.");
     return;
   }
@@ -1806,7 +1982,6 @@ async function submitAssistantStartReport(index, device) {
     return;
   }
 
-  // 전체 화면 제출 중 표시
   showReportSubmitLoading("보조강사 시작보고를 제출하고 있습니다.");
 
   if (submitButton) {
@@ -1815,6 +1990,12 @@ async function submitAssistantStartReport(index, device) {
   }
 
   try {
+    // HEIC/HEIF는 선택 단계에서 이미 변환되었으면
+    // 변환된 파일을 사용하고,
+    // 아직 변환되지 않았다면 여기서 한 번만 변환
+    const file =
+      photoInput.__preparedFile || (await prepareUploadFile(originalFile));
+
     // ==========================================================
     // 1. 사진 용량 축소 + Base64 변환
     // ==========================================================
@@ -2063,24 +2244,239 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+// ============================================================
+// 이미지 파일 공통 처리
+// HEIC / HEIF → 실제 JPEG 변환
+// ============================================================
 
-function fileToBase64(file) {
+function isHeicCandidate(file) {
+  if (!file) {
+    return false;
+  }
+
+  const type = String(file.type || "")
+    .toLowerCase()
+    .split(";")[0]
+    .trim();
+
+  const name = String(file.name || "").toLowerCase();
+
+  return (
+    type === "image/heic" ||
+    type === "image/heif" ||
+    type === "image/heic-sequence" ||
+    type === "image/heif-sequence" ||
+    /\.heic$/i.test(name) ||
+    /\.heif$/i.test(name)
+  );
+}
+
+function isImageFile(file) {
+  if (!file) {
+    return false;
+  }
+
+  const type = String(file.type || "")
+    .toLowerCase()
+    .split(";")[0]
+    .trim();
+
+  const name = String(file.name || "");
+
+  return (
+    type.startsWith("image/") ||
+    /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name)
+  );
+}
+
+function isPdfFile(file) {
+  if (!file) {
+    return false;
+  }
+
+  const type = String(file.type || "")
+    .toLowerCase()
+    .split(";")[0]
+    .trim();
+
+  const name = String(file.name || "");
+
+  return type === "application/pdf" || /\.pdf$/i.test(name);
+}
+
+function makeJpegFileName(originalName) {
+  const name = String(originalName || "image");
+
+  const baseName = name.replace(/\.[^/.]+$/, "");
+
+  return `${baseName}.jpg`;
+}
+
+async function convertHeicToJpeg(file) {
+  if (!file) {
+    throw new Error("변환할 이미지 파일이 없습니다.");
+  }
+
+  if (
+    typeof window.HeicTo !== "function" ||
+    typeof window.HeicTo.isHeic !== "function"
+  ) {
+    throw new Error(
+      "HEIC 사진 변환 기능을 불러오지 못했습니다.\n\n페이지를 새로고침한 뒤 다시 시도해주세요.",
+    );
+  }
+
+  let isHeic = false;
+
+  try {
+    isHeic = await window.HeicTo.isHeic(file);
+  } catch (error) {
+    console.error("HEIC 파일 확인 오류:", error);
+
+    throw new Error(
+      `"${file.name || "사진"}" 파일 형식을 확인하지 못했습니다.`,
+    );
+  }
+
+  if (!isHeic) {
+    return file;
+  }
+
+  console.log("[HEIC 변환 시작]", {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  });
+
+  try {
+    let jpegBlob = await window.HeicTo({
+      blob: file,
+      type: "image/jpeg",
+      quality: 0.88,
+    });
+
+    // 라이브러리 버전에 따라 배열로 반환될 가능성 대응
+    if (Array.isArray(jpegBlob)) {
+      jpegBlob = jpegBlob[0];
+    }
+
+    if (!jpegBlob) {
+      throw new Error("JPEG 변환 결과가 없습니다.");
+    }
+
+    const jpegFile = new File([jpegBlob], makeJpegFileName(file.name), {
+      type: "image/jpeg",
+      lastModified: file.lastModified || Date.now(),
+    });
+
+    // 원본 파일 정보 보존
+    try {
+      Object.defineProperties(jpegFile, {
+        __originalName: {
+          value: file.name,
+          enumerable: false,
+          configurable: true,
+        },
+        __originalSize: {
+          value: file.size,
+          enumerable: false,
+          configurable: true,
+        },
+        __originalLastModified: {
+          value: file.lastModified,
+          enumerable: false,
+          configurable: true,
+        },
+      });
+    } catch (metaError) {
+      console.warn("변환 파일 메타정보 추가 실패:", metaError);
+    }
+
+    console.log("[HEIC 변환 완료]", {
+      originalName: file.name,
+      convertedName: jpegFile.name,
+      originalSize: file.size,
+      convertedSize: jpegFile.size,
+    });
+
+    return jpegFile;
+  } catch (error) {
+    console.error("HEIC → JPEG 변환 오류:", error);
+
+    throw new Error(
+      `"${file.name || "사진"}" HEIC 사진을 JPEG로 변환하지 못했습니다.\n\n사진을 다시 선택해주세요.`,
+    );
+  }
+}
+
+async function prepareUploadFile(file) {
+  if (!file) {
+    throw new Error("업로드할 파일이 없습니다.");
+  }
+
+  // HEIC / HEIF인 경우 실제 JPEG 데이터로 변환
+  if (isHeicCandidate(file)) {
+    return await convertHeicToJpeg(file);
+  }
+
+  // 일반 JPG / PNG / WebP / PDF 등은 기존 파일 그대로 사용
+  return file;
+}
+
+async function fileToBase64(file) {
+  // 혹시 호출자가 원본 HEIC를 직접 넘긴 경우까지 방어
+  const preparedFile = await prepareUploadFile(file);
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+
     reader.onload = () => {
       const result = String(reader.result || "");
+
       const commaIndex = result.indexOf(",");
+
       if (commaIndex === -1) {
         reject(new Error("사진 데이터를 읽을 수 없습니다."));
         return;
       }
-      resolve(result.substring(commaIndex + 1));
+
+      const base64 = result.substring(commaIndex + 1);
+
+      if (!base64) {
+        reject(new Error("사진 데이터가 비어 있습니다."));
+        return;
+      }
+
+      resolve(base64);
     };
-    reader.onerror = () => reject(new Error("사진 파일을 읽지 못했습니다."));
-    reader.readAsDataURL(file);
+
+    reader.onerror = () => {
+      reject(
+        new Error(`"${preparedFile.name || "파일"}" 파일을 읽지 못했습니다.`),
+      );
+    };
+
+    reader.onabort = () => {
+      reject(
+        new Error(
+          `"${preparedFile.name || "파일"}" 파일 읽기가 중단되었습니다.`,
+        ),
+      );
+    };
+
+    reader.readAsDataURL(preparedFile);
   });
 }
-function compressImageFile(file) {
+
+async function compressImageFile(file) {
+  const preparedFile = await prepareUploadFile(file);
+
+  if (!isImageFile(preparedFile)) {
+    throw new Error(
+      `"${preparedFile.name || "파일"}"은 이미지 파일이 아닙니다.`,
+    );
+  }
+
   return new Promise(function (resolve, reject) {
     const reader = new FileReader();
 
@@ -2088,61 +2484,115 @@ function compressImageFile(file) {
       const img = new Image();
 
       img.onload = function () {
-        const maxWidth = 1600;
+        try {
+          const maxWidth = 1600;
+          const maxHeight = 1600;
 
-        const maxHeight = 1600;
+          let width = img.width;
+          let height = img.height;
 
-        let width = img.width;
+          if (!width || !height) {
+            reject(
+              new Error(
+                `"${preparedFile.name || "사진"}" 이미지 크기를 확인할 수 없습니다.`,
+              ),
+            );
+            return;
+          }
 
-        let height = img.height;
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
 
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
 
-          width = Math.round(width * ratio);
+          const canvas = document.createElement("canvas");
 
-          height = Math.round(height * ratio);
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext("2d");
+
+          if (!ctx) {
+            reject(new Error("이미지 처리 공간을 만들 수 없습니다."));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+
+          if (!dataUrl || dataUrl === "data:,") {
+            reject(
+              new Error(
+                `"${preparedFile.name || "사진"}" 이미지를 JPEG로 변환하지 못했습니다.`,
+              ),
+            );
+            return;
+          }
+
+          const commaIndex = dataUrl.indexOf(",");
+
+          if (commaIndex === -1) {
+            reject(new Error("JPEG 이미지 데이터를 읽지 못했습니다."));
+            return;
+          }
+
+          const base64 = dataUrl.substring(commaIndex + 1);
+
+          const baseName = String(preparedFile.name || "image").replace(
+            /\.[^/.]+$/,
+            "",
+          );
+
+          resolve({
+            base64: base64,
+            fileName: baseName + ".jpg",
+            fileType: "image/jpeg",
+          });
+        } catch (error) {
+          console.error("이미지 압축 처리 오류:", error);
+
+          reject(
+            new Error(
+              `"${preparedFile.name || "사진"}" 이미지를 처리하지 못했습니다.`,
+            ),
+          );
         }
-
-        const canvas = document.createElement("canvas");
-
-        canvas.width = width;
-
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d");
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const base64 = canvas.toDataURL("image/jpeg", 0.8);
-
-        const originalName = String(file.name || "");
-
-        const baseName = originalName.replace(/\.[^/.]+$/, "");
-
-        resolve({
-          base64: base64,
-
-          fileName: baseName + ".jpg",
-
-          fileType: "image/jpeg",
-        });
       };
 
       img.onerror = function () {
-        reject(new Error("이미지 파일을 불러오지 못했습니다."));
+        reject(
+          new Error(
+            `"${preparedFile.name || "사진"}" 이미지를 불러오지 못했습니다.`,
+          ),
+        );
       };
 
       img.src = reader.result;
     };
 
     reader.onerror = function () {
-      reject(new Error("이미지 파일을 읽지 못했습니다."));
+      reject(
+        new Error(
+          `"${preparedFile.name || "사진"}" 이미지 파일을 읽지 못했습니다.`,
+        ),
+      );
     };
 
-    reader.readAsDataURL(file);
+    reader.onabort = function () {
+      reject(
+        new Error(
+          `"${preparedFile.name || "사진"}" 이미지 읽기가 중단되었습니다.`,
+        ),
+      );
+    };
+
+    reader.readAsDataURL(preparedFile);
   });
 }
+
 // ========================================
 // 보조강사 종료보고 열기 / 닫기
 // ========================================
@@ -2339,7 +2789,7 @@ function renderAssistantEndReportForm(index, device) {
           <input
   type="file"
   id="${prefix}_classPhotos"
-  accept="image/*"
+  accept="image/*,.heic,.heif"
   multiple
   onchange="previewAssistantClassPhotos('${device}', ${index})"
 />
@@ -2360,7 +2810,7 @@ function renderAssistantEndReportForm(index, device) {
           <input
             type="file"
             id="${prefix}_attendanceBook"
-            accept="image/*,.pdf"
+            accept="image/*,.heic,.heif,.pdf"
             onchange="handleSinglePhotoSelect('${prefix}_attendanceBookPreview', '${prefix}_attendanceBookPreviewImage', this)"
           />
           <div
@@ -2383,7 +2833,7 @@ function renderAssistantEndReportForm(index, device) {
           <input
             type="file"
             id="${prefix}_consent"
-            accept="image/*,.pdf"
+            accept="image/*,.heic,.heif,.pdf"
             onchange="handleSinglePhotoSelect('${prefix}_consentPreview', '${prefix}_consentPreviewImage', this)"
           />
           <div
@@ -2604,12 +3054,20 @@ async function submitAssistantEndReport(index, device) {
     // ============================================================
 
     const photoKey = `${device}_${index}`;
+    const classPhotoInput = document.getElementById(`${prefix}_classPhotos`);
+
+    if (classPhotoInput?.__processingClassPhotos) {
+      alert("사진 처리가 완료될 때까지 잠시 기다려주세요.");
+      return;
+    }
 
     const selectedPhotoFiles =
       window.assistantClassPhotoFiles?.[photoKey] || [];
 
-    if (selectedPhotoFiles.length === 0) {
-      alert("수업사진을 첨부해주세요.");
+    if (selectedPhotoFiles.length < 6) {
+      alert(
+        `수업사진은 최소 6장 이상 첨부해주세요.\n현재 ${selectedPhotoFiles.length}장입니다.`,
+      );
       return;
     }
 
@@ -2619,12 +3077,10 @@ async function submitAssistantEndReport(index, device) {
     }
 
     // 이미지 파일 확인
-    const invalidFile = selectedPhotoFiles.find(
-      (file) => !file.type.startsWith("image/"),
-    );
+    const invalidFile = selectedPhotoFiles.find((file) => !isImageFile(file));
 
     if (invalidFile) {
-      alert("수업사진은 이미지 파일만 첨부할 수 있습니다.");
+      alert(`"${invalidFile.name || "사진"}" 파일은 이미지 파일이 아닙니다.`);
       return;
     }
 
@@ -2641,13 +3097,13 @@ async function submitAssistantEndReport(index, device) {
     const photoDataList = [];
 
     for (const file of selectedPhotoFiles) {
-      const compressedPhoto = await compressImageFile(file);
+      const preparedFile = await prepareUploadFile(file);
+
+      const compressedPhoto = await compressImageFile(preparedFile);
 
       photoDataList.push({
         data: compressedPhoto.base64,
-
         name: compressedPhoto.fileName,
-
         type: compressedPhoto.fileType,
       });
     }
@@ -2669,7 +3125,11 @@ async function submitAssistantEndReport(index, device) {
       attendanceBookInput.files &&
       attendanceBookInput.files.length > 0
     ) {
-      const file = attendanceBookInput.files[0];
+      const originalFile = attendanceBookInput.files[0];
+
+      const file =
+        attendanceBookInput.__preparedFile ||
+        (await prepareUploadFile(originalFile));
 
       attendanceBookData = await fileToBase64(file);
 
@@ -2689,7 +3149,10 @@ async function submitAssistantEndReport(index, device) {
     let consentType = "";
 
     if (consentInput && consentInput.files && consentInput.files.length > 0) {
-      const file = consentInput.files[0];
+      const originalFile = consentInput.files[0];
+
+      const file =
+        consentInput.__preparedFile || (await prepareUploadFile(originalFile));
 
       consentData = await fileToBase64(file);
 
@@ -2926,38 +3389,46 @@ async function submitAssistantEndReport(index, device) {
 // 보조강사 종료보고 수업사진 미리보기
 // ========================================
 
-function previewAssistantClassPhotos(device, index) {
+async function previewAssistantClassPhotos(device, index) {
   const prefix = `assistantEnd_${device}_${index}`;
 
   const input = document.getElementById(`${prefix}_classPhotos`);
   const preview = document.getElementById(`${prefix}_classPhotosPreview`);
   const count = document.getElementById(`${prefix}_classPhotosCount`);
+  const submitButton = document.getElementById(`${prefix}_submit`);
 
-  if (!input || !preview || !count) return;
-
-  // ------------------------------------------------------------
-  // 현재 input에서 새로 선택한 파일 가져오기
-  // ------------------------------------------------------------
+  if (!input || !preview || !count) {
+    return;
+  }
 
   if (!input.files || input.files.length === 0) {
     return;
   }
 
+  // 이미 사진 처리 중이면 중복 실행 방지
+  if (input.__processingClassPhotos) {
+    return;
+  }
+
   const newFiles = Array.from(input.files);
 
-  // 이미지 파일 여부 확인
-  const invalidFile = newFiles.find((file) => !file.type.startsWith("image/"));
+  // ------------------------------------------------------
+  // 파일 자체가 이미지인지 먼저 확인
+  // ------------------------------------------------------
+  const invalidFile = newFiles.find((file) => !isImageFile(file));
 
   if (invalidFile) {
-    alert("수업사진은 이미지 파일만 첨부할 수 있습니다.");
+    alert(
+      `"${invalidFile.name || "사진"}" 파일은 이미지 파일만 첨부할 수 있습니다.`,
+    );
+
     input.value = "";
     return;
   }
 
-  // ------------------------------------------------------------
-  // 이 보고서의 기존 누적 사진 배열
-  // ------------------------------------------------------------
-
+  // ------------------------------------------------------
+  // 실제 제출용 사진 저장소
+  // ------------------------------------------------------
   if (!window.assistantClassPhotoFiles) {
     window.assistantClassPhotoFiles = {};
   }
@@ -2970,68 +3441,294 @@ function previewAssistantClassPhotos(device, index) {
 
   const files = window.assistantClassPhotoFiles[photoKey];
 
-  // ------------------------------------------------------------
-  // 새로 선택한 사진을 기존 사진 뒤에 추가
-  // 동일 파일은 중복 추가하지 않음
-  // ------------------------------------------------------------
-
-  newFiles.forEach((newFile) => {
-    const alreadyExists = files.some((existingFile) => {
-      return (
-        existingFile.name === newFile.name &&
-        existingFile.size === newFile.size &&
-        existingFile.lastModified === newFile.lastModified
-      );
-    });
-
-    if (!alreadyExists) {
-      files.push(newFile);
+  // ------------------------------------------------------
+  // 원본 파일 메타정보 저장
+  // ------------------------------------------------------
+  function saveOriginalMeta(preparedFile, originalFile) {
+    try {
+      if (!preparedFile.__originalName) {
+        Object.defineProperties(preparedFile, {
+          __originalName: {
+            value: originalFile.name,
+            enumerable: false,
+            configurable: true,
+          },
+          __originalSize: {
+            value: originalFile.size,
+            enumerable: false,
+            configurable: true,
+          },
+          __originalLastModified: {
+            value: originalFile.lastModified,
+            enumerable: false,
+            configurable: true,
+          },
+        });
+      }
+    } catch (metaError) {
+      console.warn("수업사진 원본 메타정보 저장 실패:", metaError);
     }
-  });
 
-  // ------------------------------------------------------------
-  // input 초기화
-  //
-  // 같은 사진을 다시 선택해도 change 이벤트가 발생하도록 함
-  // ------------------------------------------------------------
-
-  input.value = "";
-
-  // ------------------------------------------------------------
-  // 미리보기 다시 그리기
-  // ------------------------------------------------------------
-
-  preview.innerHTML = "";
-
-  if (files.length === 0) {
-    preview.style.display = "none";
-    count.textContent = "※ 수업사진은 최소 6장 이상 첨부해주세요.";
-    return;
+    return preparedFile;
   }
 
-  count.textContent = `※ 수업사진 ${files.length}장 첨부됨 (최소 6장)`;
+  // ------------------------------------------------------
+  // 동일 파일 중복 확인
+  // ------------------------------------------------------
+  function isDuplicateFile(newFile) {
+    return files.some((existingFile) => {
+      const existingOriginalName =
+        existingFile.__originalName || existingFile.name;
 
-  preview.style.display = "grid";
+      const existingOriginalSize =
+        existingFile.__originalSize ?? existingFile.size;
 
-  files.forEach((file, fileIndex) => {
-    const objectUrl = URL.createObjectURL(file);
+      const existingOriginalLastModified =
+        existingFile.__originalLastModified ?? existingFile.lastModified;
 
-    const wrapper = document.createElement("div");
-    wrapper.className = "assistant-photo-preview-item";
+      return (
+        existingOriginalName === newFile.name &&
+        existingOriginalSize === newFile.size &&
+        existingOriginalLastModified === newFile.lastModified
+      );
+    });
+  }
 
-    const img = document.createElement("img");
+  // ------------------------------------------------------
+  // 미리보기 전체 렌더링
+  // ------------------------------------------------------
+  function renderPreviews() {
+    preview.innerHTML = "";
 
-    img.src = objectUrl;
-    img.alt = `수업사진 ${fileIndex + 1}`;
-    img.loading = "lazy";
+    if (files.length === 0) {
+      preview.style.display = "none";
+      return;
+    }
 
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-    };
+    preview.style.display = "grid";
 
-    wrapper.appendChild(img);
-    preview.appendChild(wrapper);
-  });
+    files.forEach((file, fileIndex) => {
+      const objectUrl = URL.createObjectURL(file);
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "assistant-photo-preview-item";
+
+      const img = document.createElement("img");
+
+      img.src = objectUrl;
+      img.alt = `수업사진 ${fileIndex + 1}`;
+      img.loading = "lazy";
+
+      img.onload = () => {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+          console.warn("수업사진 미리보기 URL 해제 실패:", error);
+        }
+      };
+
+      img.onerror = () => {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+          console.warn("수업사진 미리보기 URL 해제 실패:", error);
+        }
+      };
+
+      wrapper.appendChild(img);
+      preview.appendChild(wrapper);
+    });
+  }
+
+  // ------------------------------------------------------
+  // 첨부 개수 표시
+  // ------------------------------------------------------
+  function updateCount(totalCount, pendingCount) {
+    if (pendingCount > 0) {
+      count.textContent =
+        `※ 수업사진 ${totalCount}장 첨부됨 · ` +
+        `사진 ${pendingCount}장 변환 중...`;
+      return;
+    }
+
+    if (files.length >= 6) {
+      count.textContent = `※ 수업사진 ${files.length}장 첨부됨`;
+    } else {
+      count.textContent = `※ 수업사진 ${files.length}장 첨부됨 (최소 6장 필요)`;
+    }
+  }
+
+  // ------------------------------------------------------
+  // 사진 처리 시작
+  // ------------------------------------------------------
+  input.__processingClassPhotos = true;
+
+  // 파일 선택창도 처리 중에는 잠시 비활성화
+  input.disabled = true;
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "사진 확인 중...";
+  }
+
+  // ------------------------------------------------------
+  // 새 파일 분류
+  // 일반 사진 → 즉시 추가
+  // HEIC/HEIF → 별도 변환
+  // ------------------------------------------------------
+  const normalFiles = [];
+  const heicFiles = [];
+
+  for (const newFile of newFiles) {
+    if (isDuplicateFile(newFile)) {
+      continue;
+    }
+
+    if (isHeicCandidate(newFile)) {
+      heicFiles.push(newFile);
+    } else {
+      normalFiles.push(newFile);
+    }
+  }
+
+  try {
+    // ======================================================
+    // 1. 일반 사진은 변환 없이 즉시 추가
+    // ======================================================
+    normalFiles.forEach((newFile) => {
+      const preparedFile = saveOriginalMeta(newFile, newFile);
+
+      if (!isImageFile(preparedFile)) {
+        throw new Error(
+          `"${newFile.name || "사진"}" 파일을 이미지로 처리하지 못했습니다.`,
+        );
+      }
+
+      files.push(preparedFile);
+    });
+
+    // 일반 사진은 여기서 바로 미리보기 표시
+    renderPreviews();
+
+    const totalSelectedCount = files.length + heicFiles.length;
+
+    if (totalSelectedCount > 0) {
+      updateCount(totalSelectedCount, heicFiles.length);
+    }
+
+    // ------------------------------------------------------
+    // 중요:
+    // 브라우저가 먼저 일반 사진 미리보기를 화면에 그리도록
+    // 한 번 화면 갱신 기회를 준 뒤 HEIC 변환 시작
+    // ------------------------------------------------------
+    if (normalFiles.length > 0 && heicFiles.length > 0) {
+      await new Promise((resolve) => {
+        requestAnimationFrame(resolve);
+      });
+    }
+
+    // ======================================================
+    // 2. HEIC / HEIF만 변환
+    // ======================================================
+    const failedFiles = [];
+
+    for (let i = 0; i < heicFiles.length; i++) {
+      const newFile = heicFiles[i];
+
+      updateCount(files.length + (heicFiles.length - i), heicFiles.length - i);
+
+      try {
+        const preparedFile = await prepareUploadFile(newFile);
+
+        if (!isImageFile(preparedFile)) {
+          throw new Error(
+            `"${newFile.name || "사진"}" 파일을 이미지로 처리하지 못했습니다.`,
+          );
+        }
+
+        saveOriginalMeta(preparedFile, newFile);
+
+        files.push(preparedFile);
+
+        // 변환된 사진이 완료될 때마다 미리보기에 반영
+        renderPreviews();
+
+        updateCount(
+          files.length + (heicFiles.length - i - 1),
+          heicFiles.length - i - 1,
+        );
+
+        // 다음 HEIC 변환 전에 브라우저 화면 갱신
+        await new Promise((resolve) => {
+          requestAnimationFrame(resolve);
+        });
+      } catch (error) {
+        console.error(`HEIC/HEIF 사진 변환 실패: ${newFile.name}`, error);
+
+        failedFiles.push(newFile.name || "사진");
+      }
+    }
+
+    // ======================================================
+    // 3. 최종 상태
+    // ======================================================
+    if (files.length === 0) {
+      preview.style.display = "none";
+      count.textContent = "※ 수업사진은 최소 6장 이상 첨부해주세요.";
+    } else if (files.length >= 6) {
+      count.textContent = `※ 수업사진 ${files.length}장 첨부됨`;
+    } else {
+      count.textContent = `※ 수업사진 ${files.length}장 첨부됨 (최소 6장 필요)`;
+    }
+
+    // ======================================================
+    // 4. 변환 실패 사진이 있는 경우
+    // 정상 처리된 사진은 그대로 유지
+    // ======================================================
+    if (failedFiles.length > 0) {
+      alert(
+        "일부 사진을 변환하지 못했습니다.\n\n" +
+          failedFiles.map((name) => `- ${name}`).join("\n") +
+          "\n\n해당 사진만 다시 선택해주세요.",
+      );
+    }
+
+    // ======================================================
+    // 5. 제출 버튼 상태
+    // ======================================================
+    if (submitButton) {
+      submitButton.disabled = files.length < 6;
+      submitButton.textContent = "종료보고 제출";
+    }
+  } catch (error) {
+    console.error("보조강사 수업사진 처리 오류:", error);
+
+    input.value = "";
+
+    if (files.length > 0) {
+      count.textContent =
+        files.length >= 6
+          ? `※ 수업사진 ${files.length}장 첨부됨`
+          : `※ 수업사진 ${files.length}장 첨부됨 (최소 6장 필요)`;
+    } else {
+      count.textContent = "※ 수업사진은 최소 6장 이상 첨부해주세요.";
+    }
+
+    renderPreviews();
+
+    alert(
+      error.message ||
+        "수업사진을 처리하지 못했습니다.\n\n사진을 다시 선택해주세요.",
+    );
+
+    if (submitButton) {
+      submitButton.disabled = files.length < 6;
+      submitButton.textContent = "종료보고 제출";
+    }
+  } finally {
+    input.__processingClassPhotos = false;
+    input.disabled = false;
+  }
 }
 // ============================================================
 // 날짜 네비게이션
@@ -3328,8 +4025,6 @@ function renderFilteredSchedules() {
       }
 
       emptyMessage.style.display = "block";
-
-      emptyMessage.style.display = "block";
     }
 
     if (cardWrap) {
@@ -3448,21 +4143,6 @@ function showReportSubmitLoading(message) {
   // 화면 스크롤 방지
   document.body.style.overflow = "hidden";
 }
-
-// ============================================================
-// 제출 중 페이지 이탈 경고
-// ============================================================
-
-window.addEventListener("beforeunload", function (event) {
-  if (!window.__reportSubmitInProgress) {
-    return;
-  }
-
-  event.preventDefault();
-
-  event.returnValue =
-    "보고서 제출이 완료되지 않았습니다. 페이지를 나가시겠습니까?";
-});
 
 // ------------------------------------------------------------
 // 제출 로딩 화면 제거
