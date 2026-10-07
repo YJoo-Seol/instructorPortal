@@ -1015,3 +1015,8 @@
   opacity: 0.35;
   color: #999;
 }
+
+.report-time-late {
+  color: #dc2626 !important;
+  font-weight: 700;
+}

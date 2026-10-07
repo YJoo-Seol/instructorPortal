@@ -273,20 +273,82 @@ function logoutAdmin() {
 }
 // ============================================================
 // 운영진 대시보드 캐시 저장
+//
+// 주간별로 각각 저장
+// 예:
+// {
+//   "2026-10-05": {
+//      schedules: [...],
+//      savedAt: 123456789
+//   },
+//   "2026-10-12": {
+//      schedules: [...],
+//      savedAt: 123456789
+//   }
+// }
+//
+// 기존 단일 주간 캐시와도 호환
 // ============================================================
 
 function saveAdminDashboardCache() {
   try {
-    const weekKey = getAdminWeekKey(selectedAdminDate);
+    const currentWeekKey = getAdminWeekKey(selectedAdminDate);
 
-    sessionStorage.setItem(
-      ADMIN_CACHE_KEY,
-      JSON.stringify({
-        schedules: allAdminSchedules || [],
-        weekKey: weekKey,
-        savedAt: Date.now(),
-      }),
-    );
+    let cacheData = {
+      weeks: {},
+    };
+
+    const cached = sessionStorage.getItem(ADMIN_CACHE_KEY);
+
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+
+        // ----------------------------------------------------
+        // 새 다중 주간 캐시
+        // ----------------------------------------------------
+
+        if (parsed && parsed.weeks && typeof parsed.weeks === "object") {
+          cacheData = parsed;
+        }
+
+        // ----------------------------------------------------
+        // 기존 단일 주간 캐시
+        // → 새 구조로 자동 변환
+        // ----------------------------------------------------
+        else if (parsed && Array.isArray(parsed.schedules)) {
+          const oldWeekKey = String(parsed.weekKey || "").trim();
+
+          if (oldWeekKey) {
+            cacheData.weeks[oldWeekKey] = {
+              schedules: parsed.schedules,
+              savedAt: parsed.savedAt || Date.now(),
+            };
+          }
+        }
+      } catch (parseError) {
+        console.warn("[운영진 대시보드] 기존 캐시 변환 실패:", parseError);
+      }
+    }
+
+    // --------------------------------------------------------
+    // 현재 주 캐시 저장
+    // --------------------------------------------------------
+
+    cacheData.weeks[currentWeekKey] = {
+      schedules: Array.isArray(allAdminSchedules) ? allAdminSchedules : [],
+      savedAt: Date.now(),
+    };
+
+    sessionStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(cacheData));
+
+    console.log("[운영진 대시보드] 주간 캐시 저장:", {
+      weekKey: currentWeekKey,
+      schedules: Array.isArray(allAdminSchedules)
+        ? allAdminSchedules.length
+        : 0,
+      cachedWeeks: Object.keys(cacheData.weeks).length,
+    });
   } catch (e) {
     console.warn("운영진 대시보드 캐시 저장 실패:", e);
   }
@@ -294,6 +356,15 @@ function saveAdminDashboardCache() {
 
 // ============================================================
 // 운영진 대시보드 캐시 불러오기
+//
+// 현재 선택 날짜가 속한 주의 캐시를 찾는다.
+//
+// 캐시가 있으면:
+//   true 반환
+//   allAdminSchedules에 캐시 데이터 저장
+//
+// 캐시가 없으면:
+//   false 반환
 // ============================================================
 
 function loadAdminDashboardCache() {
@@ -306,20 +377,46 @@ function loadAdminDashboardCache() {
 
     const data = JSON.parse(cached);
 
-    if (!data || !Array.isArray(data.schedules)) {
-      return false;
+    // --------------------------------------------------------
+    // 새 다중 주간 캐시
+    // --------------------------------------------------------
+
+    if (data && data.weeks && typeof data.weeks === "object") {
+      const currentWeekKey = getAdminWeekKey(selectedAdminDate);
+
+      const weekCache = data.weeks[currentWeekKey];
+
+      if (!weekCache || !Array.isArray(weekCache.schedules)) {
+        return false;
+      }
+
+      allAdminSchedules = weekCache.schedules;
+
+      console.log("[운영진 대시보드] 주간 캐시 적중:", {
+        weekKey: currentWeekKey,
+        schedules: allAdminSchedules.length,
+      });
+
+      return true;
     }
 
-    // 현재 선택된 날짜의 주간 데이터인지 확인
-    const currentWeekKey = getAdminWeekKey(selectedAdminDate);
+    // --------------------------------------------------------
+    // 기존 단일 주간 캐시 호환
+    // --------------------------------------------------------
 
-    if (data.weekKey && data.weekKey !== currentWeekKey) {
-      return false;
+    if (data && Array.isArray(data.schedules)) {
+      const currentWeekKey = getAdminWeekKey(selectedAdminDate);
+
+      if (data.weekKey && data.weekKey !== currentWeekKey) {
+        return false;
+      }
+
+      allAdminSchedules = data.schedules;
+
+      return true;
     }
 
-    allAdminSchedules = data.schedules;
-
-    return true;
+    return false;
   } catch (e) {
     console.warn("운영진 대시보드 캐시 불러오기 실패:", e);
 
@@ -331,11 +428,11 @@ function loadAdminDashboardCache() {
 // 관리자 일정 조회
 //
 // 동작
-// 1. 캐시가 있으면 즉시 화면 표시
+// 1. 현재 선택 날짜가 속한 주간 캐시 확인
 // 2. 최신 데이터 조회 중에는 "일정 없음" 표시 안 함
 // 3. 이미 조회 중이면 중복 서버 요청 방지
 // 4. 최신 데이터 조회 완료 후에만 실제 일정 없음 판단
-// 5. 조회 실패 시 기존 캐시가 있으면 기존 화면 유지
+// 5. 조회 실패 시 기존 데이터가 있으면 기존 화면 유지
 // ==========================================================
 
 async function loadAdminData() {
@@ -369,37 +466,34 @@ async function loadAdminData() {
     const targetDate = `${year}-${month}-${day}`;
 
     // --------------------------------------------------------
-    // 1. 캐시 먼저 확인
+    // 1. 현재 선택 날짜가 속한 주간 캐시 확인
+    //
+    // 캐시는 서버 조회 실패 시 기존 데이터 유지용으로도 사용.
+    // 캐시가 있더라도 새 주 이동 시 최신 서버 조회는 진행.
     // --------------------------------------------------------
 
     const hasCache = loadAdminDashboardCache();
 
-    // --------------------------------------------------------
-    // 2. 캐시가 있으면 즉시 화면 표시
-    // --------------------------------------------------------
+    const emptyMessage = document.getElementById("emptyMessage");
+
+    const loading = document.getElementById("loadingMessage");
 
     if (hasCache) {
-      console.log("[운영진 대시보드] 캐시 즉시 표시");
-
-      renderFilteredAdminSchedules();
-    } else {
-      // ------------------------------------------------------
-      // 캐시가 없을 때만 로딩 표시
-      // ------------------------------------------------------
-
-      const list = document.getElementById("adminList");
-
-      if (list) {
-        list.innerHTML = `
-          <div class="loading-message">
-            일정을 불러오는 중입니다.
-          </div>
-        `;
+      // 캐시는 확보만 해두고,
+      // 최신 데이터를 불러오는 동안에는 카드 대신 로딩 문구 표시
+      if (emptyMessage) {
+        emptyMessage.style.display = "none";
       }
 
-      // 캐시가 없고 아직 조회 중이므로
-      // 일정 없음 메시지는 숨김
-      const emptyMessage = document.getElementById("emptyMessage");
+      showLoading();
+
+      console.log("[운영진 대시보드] 캐시 확인 → 최신 데이터 조회");
+    } else {
+      // --------------------------------------------------------
+      // 캐시가 없으면 일정 목록을 비우고 로딩 표시
+      // --------------------------------------------------------
+
+      showLoading();
 
       if (emptyMessage) {
         emptyMessage.style.display = "none";
@@ -489,7 +583,15 @@ async function loadAdminData() {
     saveAdminDashboardCache();
 
     // --------------------------------------------------------
-    // 9. 최신 화면 반영
+    // 9. 서버 조회 완료
+    // --------------------------------------------------------
+
+    adminSchedulesLoading = false;
+
+    hideLoading();
+
+    // --------------------------------------------------------
+    // 10. 최신 화면 반영
     // --------------------------------------------------------
 
     renderFilteredAdminSchedules();
@@ -505,11 +607,10 @@ async function loadAdminData() {
     // 캐시가 있으면 기존 화면 유지
     // --------------------------------------------------------
 
-    if (Array.isArray(allAdminSchedules) && allAdminSchedules.length > 0) {
-      console.warn("[운영진 대시보드] 최신 조회 실패 → 기존 데이터 유지");
-
+    if (hasCache && Array.isArray(allAdminSchedules)) {
+      console.warn("[운영진 대시보드] 최신 조회 실패 → 해당 주 캐시 유지");
+      hideLoading();
       renderFilteredAdminSchedules();
-
       return;
     }
 
@@ -580,7 +681,6 @@ function renderFilteredAdminSchedules() {
 
   renderAdminData(filteredSchedules);
 }
-
 // ==========================================================
 // 날짜 표시
 // ==========================================================
@@ -604,10 +704,14 @@ function updateAdminDateDisplay() {
 
   const weekday = weekdays[selectedAdminDate.getDay()];
 
+  // --------------------------------------------------------
+  // 선택 날짜 표시
+  // --------------------------------------------------------
+
   display.textContent = `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")} (${weekday})`;
 
   // --------------------------------------------------------
-  // 오늘이 포함된 주의 월요일 ~ 일요일
+  // 선택 날짜가 속한 주간 범위 표시
   // --------------------------------------------------------
 
   if (rangeDisplay) {
@@ -622,104 +726,65 @@ function updateAdminDateDisplay() {
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
 
     monday.setDate(current.getDate() + mondayOffset);
+    monday.setHours(0, 0, 0, 0);
 
     const sunday = new Date(monday);
 
     sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(0, 0, 0, 0);
 
     const mondayMonth = monday.getMonth() + 1;
-
     const mondayDay = monday.getDate();
-
     const mondayWeekday = weekdays[monday.getDay()];
 
     const sundayMonth = sunday.getMonth() + 1;
-
     const sundayDay = sunday.getDate();
-
     const sundayWeekday = weekdays[sunday.getDay()];
 
-    rangeDisplay.textContent = `${mondayMonth}월 ${mondayDay}일(${mondayWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(${sundayWeekday})까지 조회 가능`;
+    rangeDisplay.textContent =
+      `${mondayMonth}월 ${mondayDay}일(${mondayWeekday}) ~ ` +
+      `${sundayMonth}월 ${sundayDay}일(${sundayWeekday})`;
   }
 
   updateAdminDateArrowState();
 }
-
 // ==========================================================
 // 이전 / 다음 날짜
+//
+// - 같은 주 이동:
+//   기존 주간 데이터에서 날짜만 필터링
+//
+// - 다른 주 이동:
+//   기존 데이터를 화면에 필터링하지 않고
+//   새 주 데이터를 서버에서 다시 조회
+//
+// - 날짜 이동 제한 없음
 // ==========================================================
 
 function moveDate(offset) {
   console.log("[운영진 날짜 이동 실행]:", offset);
 
   const current = new Date(selectedAdminDate);
-
   current.setHours(0, 0, 0, 0);
 
   // --------------------------------------------------------
-  // 오늘 날짜
-  // --------------------------------------------------------
-
-  const today = new Date();
-
-  today.setHours(0, 0, 0, 0);
-
-  // --------------------------------------------------------
-  // 오늘이 포함된 주의 월요일 / 일요일
-  // --------------------------------------------------------
-
-  const dayOfWeek = today.getDay();
-
-  const monday = new Date(today);
-
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-
-  monday.setDate(today.getDate() + mondayOffset);
-
-  monday.setHours(0, 0, 0, 0);
-
-  const sunday = new Date(monday);
-
-  sunday.setDate(monday.getDate() + 6);
-
-  sunday.setHours(0, 0, 0, 0);
-
-  // --------------------------------------------------------
-  // 이동할 날짜
+  // 이동할 날짜 계산
   // --------------------------------------------------------
 
   const newDate = new Date(current);
 
   newDate.setDate(current.getDate() + offset);
-
   newDate.setHours(0, 0, 0, 0);
 
   // --------------------------------------------------------
-  // 이번 주 범위 밖이면 이동 차단
-  //
-  // 월요일 이전 ❌
-  // 일요일 이후 ❌
+  // 현재 주와 이동한 날짜의 주 비교
   // --------------------------------------------------------
 
-  if (newDate < monday || newDate > sunday) {
-    console.log(
-      "[운영진 날짜 이동] 이번 주 조회 범위를 벗어나므로 이동 차단:",
-      {
-        현재날짜: formatAdminDateKey(current),
-
-        이동날짜: formatAdminDateKey(newDate),
-
-        조회시작일: formatAdminDateKey(monday),
-
-        조회종료일: formatAdminDateKey(sunday),
-      },
-    );
-
-    return;
-  }
+  const currentWeekKey = getAdminWeekKey(current);
+  const newWeekKey = getAdminWeekKey(newDate);
 
   // --------------------------------------------------------
-  // 정상 이동
+  // 선택 날짜 변경
   // --------------------------------------------------------
 
   selectedAdminDate = newDate;
@@ -727,11 +792,45 @@ function moveDate(offset) {
   updateAdminDateDisplay();
 
   // --------------------------------------------------------
-  // 같은 주간 데이터에서
-  // 선택 날짜만 다시 필터링
+  // 같은 주
+  //
+  // 서버 재조회 없이 기존 데이터에서 날짜만 필터링
   // --------------------------------------------------------
 
-  renderFilteredAdminSchedules();
+  if (currentWeekKey === newWeekKey) {
+    renderFilteredAdminSchedules();
+    return;
+  }
+
+  // --------------------------------------------------------
+  // 다른 주
+  //
+  // 여기서는 renderFilteredAdminSchedules()를 호출하지 않음.
+  //
+  // 호출하면 이전 주 데이터에서 새 날짜를 찾게 되어
+  // "해당 날짜에 등록된 출강 일정이 없습니다."가
+  // 먼저 표시되는 문제가 발생함.
+  //
+  // loadAdminData()가 캐시 확인 → 로딩 표시 → 서버 조회
+  // 순서로 처리함.
+  // --------------------------------------------------------
+
+  console.log("[운영진 날짜 이동] 다른 주 → 새 주 일정 조회", {
+    이전주: currentWeekKey,
+    이동주: newWeekKey,
+    선택날짜: `${newDate.getFullYear()}-${String(
+      newDate.getMonth() + 1,
+    ).padStart(2, "0")}-${String(newDate.getDate()).padStart(2, "0")}`,
+  });
+
+  // --------------------------------------------------------
+  // 새 주 조회 시작
+  // 캐시가 있더라도 최신 데이터 확인 중임을 표시
+  // --------------------------------------------------------
+
+  // showLoading();
+
+  loadAdminData();
 }
 // ==========================================================
 // 오늘 날짜로 이동
@@ -742,22 +841,36 @@ function resetToToday() {
 
   today.setHours(0, 0, 0, 0);
 
+  const currentWeekKey = getAdminWeekKey(selectedAdminDate);
+
+  const todayWeekKey = getAdminWeekKey(today);
+
   selectedAdminDate = today;
 
   updateAdminDateDisplay();
 
-  // 현재 저장된 주간 데이터가 있으면
-  // 서버 재조회 없이 날짜만 필터링
-  if (Array.isArray(allAdminSchedules) && allAdminSchedules.length > 0) {
+  // --------------------------------------------------------
+  // 현재 가지고 있는 데이터가 오늘과 같은 주라면
+  // 서버 재조회 없이 날짜만 변경
+  // --------------------------------------------------------
+
+  if (
+    currentWeekKey === todayWeekKey &&
+    Array.isArray(allAdminSchedules) &&
+    allAdminSchedules.length > 0
+  ) {
     renderFilteredAdminSchedules();
 
     return;
   }
 
-  // 최초 페이지 로딩
+  // --------------------------------------------------------
+  // 다른 주 데이터를 보고 있었다면
+  // 오늘이 속한 주를 다시 조회
+  // --------------------------------------------------------
+
   loadAdminData();
 }
-
 // ==========================================================
 // 기존 함수명 호환
 // ==========================================================
@@ -917,11 +1030,25 @@ function renderAdminData(schedules) {
   const emptyMessage = document.getElementById("emptyMessage");
 
   if (emptyMessage) {
-    // 일정이 있으면 숨김
-    if (schedules.length > 0) {
+    // ----------------------------------------------------------
+    // 아직 서버 조회 중이면
+    // "일정 없음"을 절대 표시하지 않음
+    // ----------------------------------------------------------
+
+    if (adminSchedulesLoading) {
       emptyMessage.style.display = "none";
     }
-    // 일정이 없으면 표시
+
+    // ----------------------------------------------------------
+    // 서버 조회가 끝난 후 실제 일정이 있으면 숨김
+    // ----------------------------------------------------------
+    else if (schedules.length > 0) {
+      emptyMessage.style.display = "none";
+    }
+
+    // ----------------------------------------------------------
+    // 서버 조회가 끝났고 실제 일정도 없을 때만 표시
+    // ----------------------------------------------------------
     else {
       emptyMessage.style.display = "block";
     }
@@ -997,7 +1124,21 @@ function createScheduleCard(schedule) {
   const assistantEndReportTime = String(
     schedule.assistantEndReportTime || "",
   ).trim();
+  // ========================================================
+  // 보고 지연 여부
+  // 수업 당일 자정(23:59:59)까지 정상
+  // 다음 날 00:00:00부터 지연
+  // ========================================================
 
+  const mainLate =
+    mainComplete && isLateReport(schedule.date, mainEndReportTime);
+
+  const assistantStartLate =
+    assistantStartComplete &&
+    isLateReport(schedule.date, assistantStartReportTime);
+
+  const assistantEndLate =
+    assistantEndComplete && isLateReport(schedule.date, assistantEndReportTime);
   // ========================================================
   // 상태 클래스
   // ========================================================
@@ -1085,7 +1226,7 @@ function createScheduleCard(schedule) {
               ${
                 mainComplete && mainEndReportTime
                   ? `
-                    <span class="report-time">
+                    <span class="report-time ${mainLate ? "report-time-late" : ""}">
                       ${escapeHtml(mainEndReportTime)}
                     </span>
                   `
@@ -1134,7 +1275,7 @@ function createScheduleCard(schedule) {
               ${
                 assistantStartComplete && assistantStartReportTime
                   ? `
-                    <span class="report-time">
+                    <span class="report-time ${assistantStartLate ? "report-time-late" : ""}">
                       ${escapeHtml(assistantStartReportTime)}
                     </span>
                   `
@@ -1157,7 +1298,7 @@ function createScheduleCard(schedule) {
               ${
                 assistantEndComplete && assistantEndReportTime
                   ? `
-                    <span class="report-time">
+                    <span class="report-time ${assistantEndLate ? "report-time-late" : ""}">
                       ${escapeHtml(assistantEndReportTime)}
                     </span>
                   `
@@ -1178,6 +1319,206 @@ function createScheduleCard(schedule) {
   return card;
 }
 
+// ==========================================================
+// 보고 지연 여부
+//
+// 수업 당일 23:59:59까지 정상
+// 다음 날 00:00:00부터 지연
+// ==========================================================
+function isLateReport(scheduleDate, reportTime) {
+  if (!scheduleDate || !reportTime) {
+    return false;
+  }
+
+  const classText = String(scheduleDate).trim();
+
+  // 수업일 추출
+  // 예: 2026-10-06
+  //     2026. 10. 6
+  //     2026/10/6
+  const classMatch = classText.match(
+    /^(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})/,
+  );
+
+  if (!classMatch) {
+    console.log("[지연판정] 수업일 파싱 실패:", {
+      scheduleDate,
+      reportTime,
+    });
+    return false;
+  }
+
+  const classYear = Number(classMatch[1]);
+  const classMonth = Number(classMatch[2]);
+  const classDay = Number(classMatch[3]);
+
+  // 다음 날 00:00
+  const nextDay = new Date(classYear, classMonth - 1, classDay + 1, 0, 0, 0, 0);
+
+  const reportDate = parseAdminReportDateTime(reportTime);
+
+  if (!reportDate) {
+    console.log("[지연판정] 제출일시 파싱 실패:", {
+      scheduleDate,
+      reportTime,
+    });
+    return false;
+  }
+
+  const isLate = reportDate >= nextDay;
+
+  console.log("[지연판정]", {
+    수업일: `${classYear}-${String(classMonth).padStart(2, "0")}-${String(classDay).padStart(2, "0")}`,
+    제출일시: reportTime,
+    제출일: `${reportDate.getFullYear()}-${String(
+      reportDate.getMonth() + 1,
+    ).padStart(2, "0")}-${String(reportDate.getDate()).padStart(2, "0")}`,
+    지연여부: isLate,
+  });
+
+  return isLate;
+}
+
+// ==========================================================
+// 제출 일시에서 제출 날짜만 추출
+//
+// 지원 예:
+// 2026. 10. 7 오후 4:40:00
+// 2026. 10. 7 오후 4:40
+// 2026-10-07 16:40:00
+// 2026-10-07T16:40:00
+// 2026/10/07 오후 4:40:00
+// ==========================================================
+function getAdminReportDateOnly(value) {
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(/(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})/);
+
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return [
+    year,
+    String(month).padStart(2, "0"),
+    String(day).padStart(2, "0"),
+  ].join("-");
+}
+// ==========================================================
+// Date → YYYY-MM-DD
+// ==========================================================
+function formatAdminDateKey(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+// ==========================================================
+// 제출일시 파싱
+//
+// 예:
+// 2026. 10. 7 오후 4:40:00
+// 2026. 10. 7 오후 4:40
+// 2026-10-07 16:40:00
+// 2026-10-07 16:40
+// 2026-10-07T16:40:00
+// ==========================================================
+function parseAdminReportDateTime(value) {
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return null;
+  }
+
+  // --------------------------------------------------------
+  // 한국식 날짜 + 오전/오후
+  // --------------------------------------------------------
+  const koreanMatch = text.match(
+    /^(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})\s*(오전|오후)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/,
+  );
+
+  if (koreanMatch) {
+    const year = Number(koreanMatch[1]);
+    const month = Number(koreanMatch[2]);
+    const day = Number(koreanMatch[3]);
+    const period = koreanMatch[4] || "";
+    let hour = Number(koreanMatch[5]);
+    const minute = Number(koreanMatch[6]);
+    const second = Number(koreanMatch[7] || 0);
+
+    if (period === "오후" && hour < 12) {
+      hour += 12;
+    }
+
+    if (period === "오전" && hour === 12) {
+      hour = 0;
+    }
+
+    const result = new Date(year, month - 1, day, hour, minute, second);
+
+    if (!Number.isNaN(result.getTime())) {
+      return result;
+    }
+  }
+
+  // --------------------------------------------------------
+  // YYYY-MM-DD HH:mm:ss
+  // YYYY-MM-DD HH:mm
+  // --------------------------------------------------------
+  const standardMatch = text.match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/,
+  );
+
+  if (standardMatch) {
+    const result = new Date(
+      Number(standardMatch[1]),
+      Number(standardMatch[2]) - 1,
+      Number(standardMatch[3]),
+      Number(standardMatch[4]),
+      Number(standardMatch[5]),
+      Number(standardMatch[6] || 0),
+    );
+
+    if (!Number.isNaN(result.getTime())) {
+      return result;
+    }
+  }
+
+  // --------------------------------------------------------
+  // ISO 날짜시간
+  // --------------------------------------------------------
+  const parsed = new Date(text);
+
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  return null;
+}
 // ==========================================================
 // 날짜 표시
 // ==========================================================
@@ -1579,6 +1920,8 @@ function detectNewAdminReports(schedules, isInitialState) {
 
 // ==========================================================
 // 날짜 이동 화살표 활성화 / 비활성화
+//
+// 운영진 대시보드는 날짜 조회 제한 없음
 // ==========================================================
 
 function updateAdminDateArrowState() {
@@ -1586,68 +1929,12 @@ function updateAdminDateArrowState() {
 
   const nextArrow = document.getElementById("nextDateArrow");
 
-  if (!prevArrow && !nextArrow) {
-    return;
-  }
-
-  // --------------------------------------------------------
-  // 오늘이 포함된 주의 월요일 ~ 일요일
-  // --------------------------------------------------------
-
-  const today = new Date();
-
-  today.setHours(0, 0, 0, 0);
-
-  const dayOfWeek = today.getDay();
-
-  const monday = new Date(today);
-
-  monday.setDate(today.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
-
-  monday.setHours(0, 0, 0, 0);
-
-  const sunday = new Date(monday);
-
-  sunday.setDate(monday.getDate() + 6);
-
-  sunday.setHours(0, 0, 0, 0);
-
-  // --------------------------------------------------------
-  // 현재 선택 날짜
-  // --------------------------------------------------------
-
-  const current = new Date(selectedAdminDate);
-
-  if (isNaN(current.getTime())) {
-    return;
-  }
-
-  current.setHours(0, 0, 0, 0);
-
-  // --------------------------------------------------------
-  // 이동 가능 여부
-  // --------------------------------------------------------
-
-  const canGoPrevious = current > monday;
-
-  const canGoNext = current < sunday;
-
-  // --------------------------------------------------------
-  // 이전 화살표
-  // 월요일이면 회색
-  // --------------------------------------------------------
-
   if (prevArrow) {
-    prevArrow.classList.toggle("disabled", !canGoPrevious);
+    prevArrow.classList.remove("disabled");
   }
-
-  // --------------------------------------------------------
-  // 다음 화살표
-  // 일요일이면 회색
-  // --------------------------------------------------------
 
   if (nextArrow) {
-    nextArrow.classList.toggle("disabled", !canGoNext);
+    nextArrow.classList.remove("disabled");
   }
 }
 

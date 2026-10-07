@@ -170,88 +170,72 @@ function updateScheduleHeader(role, targetDate) {
 // ============================================================
 
 async function loadReportSchedules(data) {
+  let hasDisplayedCache = false;
+
+  // --------------------------------------------------------
+  // 현재 선택 날짜를 YYYY-MM-DD로 변환
+  // --------------------------------------------------------
+
+  const targetDate = formatScheduleDateKey(selectedScheduleDate);
+
+  // --------------------------------------------------------
+  // 서버 응답 전에는 로딩 표시
+  // --------------------------------------------------------
+
+  showLoading();
+
   try {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const day = today.getDate();
-
-    const targetDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
-    // --------------------------------------------------------
-    // 1. 캐시가 있으면 먼저 즉시 화면 표시
-    // --------------------------------------------------------
+    // ------------------------------------------------------
+    // 캐시 확인
+    // ------------------------------------------------------
 
     const cachedSchedules = getReportScheduleCache(data.instructorNo);
 
     console.log("캐시된 출강 일정 사용:", cachedSchedules);
 
-    if (cachedSchedules && Array.isArray(cachedSchedules.schedules)) {
-      const instructorNoEl = document.getElementById("instructorNo");
+    // ------------------------------------------------------
+    // 일정이 있는 캐시만 즉시 표시
+    // 빈 배열 캐시는 표시하지 않음
+    // ------------------------------------------------------
 
-      if (instructorNoEl) {
-        instructorNoEl.textContent =
-          cachedSchedules.instructorNo || data.instructorNo || "-";
-      }
-
-      const cachedRole = normalizeRole(cachedSchedules.role || data.role);
-
-      currentScheduleRole = cachedRole;
-
-      // 확정 일정 링크
-      const confirmedScheduleLink = document.getElementById(
-        "confirmedScheduleLink",
-      );
-
-      if (confirmedScheduleLink) {
-        const notionUrl = CONFIRMED_SCHEDULE_URLS[cachedRole];
-
-        if (notionUrl) {
-          confirmedScheduleLink.href = notionUrl;
-          confirmedScheduleLink.style.display = "inline-flex";
-        } else {
-          confirmedScheduleLink.style.display = "none";
-        }
-      }
-
-      // 캐시된 일정 즉시 사용
+    if (
+      cachedSchedules &&
+      Array.isArray(cachedSchedules.schedules) &&
+      cachedSchedules.schedules.length > 0
+    ) {
       allReportSchedules = cachedSchedules.schedules;
 
-      console.log("캐시된 주간 전체 일정 즉시 표시:", {
-        count: allReportSchedules.length,
-        schedules: allReportSchedules,
-      });
+      hasDisplayedCache = true;
+
+      updateDateDisplay();
 
       hideLoading();
-      updateDateDisplay();
+
       renderFilteredSchedules();
-
-      // 여기서 return 하지 않는다.
-      // 서버의 최신 보고 상태를 백그라운드에서 다시 확인한다.
-    } else {
-      // ------------------------------------------------------
-      // 캐시가 없으면 서버 조회 중이라는 것만 표시
-      // ------------------------------------------------------
-
-      showLoading();
     }
 
-    // --------------------------------------------------------
-    // 2. 서버에서 최신 일정 + 최신 보고 현황 조회
-    // --------------------------------------------------------
+    // ------------------------------------------------------
+    // 서버 최신 일정 조회
+    // ------------------------------------------------------
 
     console.log("========== 강사 일정 서버 조회 시작 ==========");
 
     const requestStart = performance.now();
 
-    const response = await fetch(API_URL, {
+    const result = await fetch(API_URL, {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify({
         action: "getInstructorReportSchedules",
+
         instructorNo: data.instructorNo,
+
+        // 중요:
+        // Date 객체가 아니라 YYYY-MM-DD 문자열 전달
         date: targetDate,
       }),
     });
@@ -260,87 +244,99 @@ async function loadReportSchedules(data) {
       "강사 일정 서버 응답:",
       Math.round(performance.now() - requestStart) + "ms",
       "HTTP:",
-      response.status,
+      result.status,
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
+    // ------------------------------------------------------
+    // HTTP 오류
+    // ------------------------------------------------------
 
-      throw new Error("서버 응답 오류 (" + response.status + "): " + errorText);
+    if (!result.ok) {
+      const errorText = await result.text();
+
+      throw new Error("서버 응답 오류 (" + result.status + "): " + errorText);
     }
 
-    const result = await response.json();
+    // ------------------------------------------------------
+    // JSON 응답
+    // ------------------------------------------------------
 
-    // --------------------------------------------------------
-    // 서버 결과 전체 확인
-    // --------------------------------------------------------
+    const response = await result.json();
 
     console.log("========== 강사 일정 서버 결과 ==========", {
-      success: result.success,
-      message: result.message,
-      error: result.error,
-      elapsedMs: result.elapsedMs,
-      notionPageCount: result.notionPageCount,
-      scheduleCount: result.schedules ? result.schedules.length : 0,
-      timing: result.timing,
+      success: response.success,
+
+      message: response.message,
+
+      error: response.error,
+
+      elapsedMs: response.elapsedMs,
+
+      notionPageCount: response.notionPageCount,
+
+      scheduleCount: Array.isArray(response.schedules)
+        ? response.schedules.length
+        : 0,
+
+      timing: response.timing,
     });
 
-    console.log("===== 서버 timing 상세 =====");
+    console.table(response.timing || {});
 
-    console.table(result.timing || {});
+    // ------------------------------------------------------
+    // 서버 작업 실패
+    // ------------------------------------------------------
 
-    // --------------------------------------------------------
-    // 서버 실패
-    // --------------------------------------------------------
-
-    if (!result.success) {
-      console.error("========== 서버 일정 조회 실패 ==========");
-
-      console.error("서버 오류 메시지:", result.message);
-
-      console.error("서버 오류 상세:", result.error);
-
-      // 캐시가 이미 화면에 표시된 경우
-      // 기존 화면을 유지하고 오류만 기록
-      if (cachedSchedules && Array.isArray(cachedSchedules.schedules)) {
-        console.error("최신 일정 갱신 실패. 기존 캐시 화면을 유지합니다.");
-
-        hideLoading();
-
-        return;
-      }
-
-      hideLoading();
-
-      showError(result.message || "출강 일정을 불러오지 못했습니다.");
-
-      return;
+    if (!response || response.success !== true) {
+      throw new Error(
+        response && (response.message || response.error)
+          ? response.message || response.error
+          : "일정 조회에 실패했습니다.",
+      );
     }
 
-    hideLoading();
+    // ------------------------------------------------------
+    // 서버 최신 일정
+    // ------------------------------------------------------
 
-    // --------------------------------------------------------
-    // 3. 최신 강사번호
-    // --------------------------------------------------------
+    allReportSchedules = Array.isArray(response.schedules)
+      ? response.schedules
+      : [];
+
+    // ------------------------------------------------------
+    // 최신 일정 캐시 저장
+    // 날짜까지 반드시 저장
+    // ------------------------------------------------------
+
+    const role = normalizeRole(response.role || data.role);
+
+    saveReportScheduleCache(
+      data.instructorNo,
+      allReportSchedules,
+      role,
+      targetDate,
+    );
+
+    // ------------------------------------------------------
+    // 최신 강사번호
+    // ------------------------------------------------------
 
     const instructorNoEl = document.getElementById("instructorNo");
 
     if (instructorNoEl) {
       instructorNoEl.textContent =
-        result.instructorNo || data.instructorNo || "-";
+        response.instructorNo || data.instructorNo || "-";
     }
 
-    // --------------------------------------------------------
-    // 4. 최신 역할
-    // --------------------------------------------------------
-
-    const role = normalizeRole(result.role || data.role);
+    // ------------------------------------------------------
+    // 최신 역할
+    // ------------------------------------------------------
 
     currentScheduleRole = role;
 
-    // --------------------------------------------------------
-    // 5. 확정 일정 링크
-    // --------------------------------------------------------
+    // ------------------------------------------------------
+    // 확정 일정 링크
+    // ------------------------------------------------------
 
     const confirmedScheduleLink = document.getElementById(
       "confirmedScheduleLink",
@@ -358,59 +354,49 @@ async function loadReportSchedules(data) {
       }
     }
 
-    // --------------------------------------------------------
-    // 6. 서버에서 받은 최신 일정으로 교체
-    // --------------------------------------------------------
+    // ------------------------------------------------------
+    // 서버 응답 후에만 로딩 종료
+    // ------------------------------------------------------
 
-    const schedules = Array.isArray(result.schedules) ? result.schedules : [];
+    hideLoading();
 
-    allReportSchedules = schedules;
-
-    console.log("서버 최신 주간 전체 일정:", {
-      count: allReportSchedules.length,
-      schedules: allReportSchedules,
-    });
-
-    // --------------------------------------------------------
-    // 8. 최신 서버 결과를 캐시에 저장
-    // --------------------------------------------------------
-
-    saveReportScheduleCache(
-      data.instructorNo,
-      allReportSchedules,
-      role,
-      targetDate,
-    );
-
-    // --------------------------------------------------------
-    // 9. 현재 선택된 날짜 기준으로 최신 데이터 다시 렌더링
-    // --------------------------------------------------------
+    // ------------------------------------------------------
+    // 현재 선택 날짜 기준 최신 일정 렌더링
+    // ------------------------------------------------------
 
     updateDateDisplay();
+
     renderFilteredSchedules();
 
     console.log("========== 최신 일정/보고 현황 화면 갱신 완료 ==========", {
       현재선택날짜: formatScheduleDateKey(selectedScheduleDate),
+
+      전체일정: allReportSchedules.length,
     });
   } catch (error) {
     console.error("출강 일정 조회 오류:", error);
 
-    hideLoading();
+    // ------------------------------------------------------
+    // 기존 캐시가 화면에 표시된 경우
+    // 캐시 화면 유지
+    // ------------------------------------------------------
 
-    // 캐시가 이미 화면에 표시되어 있었다면
-    // 캐시 화면은 그대로 유지
-
-    const cachedSchedules = getReportScheduleCache(data.instructorNo);
-
-    if (cachedSchedules && Array.isArray(cachedSchedules.schedules)) {
-      console.error("서버 최신화 실패. 캐시된 일정 화면을 유지합니다.");
+    if (hasDisplayedCache) {
+      hideLoading();
 
       return;
     }
 
+    // ------------------------------------------------------
+    // 캐시도 없는 경우
+    // ------------------------------------------------------
+
+    hideLoading();
+
     showError("출강 일정을 불러오는 중 오류가 발생했습니다.");
   }
 }
+
 // ========================================
 // 강사 정보
 // ========================================
@@ -2018,7 +2004,7 @@ async function submitAssistantStartReport(index, device) {
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "text/plain;charset=UTF-8",
       },
       body: JSON.stringify({
         action: "saveAssistantStartReport",
@@ -2215,7 +2201,22 @@ function normalizeRole(role) {
 
 function showLoading() {
   const loading = document.getElementById("loadingMessage");
-  if (loading) loading.style.display = "block";
+
+  if (loading) {
+    loading.style.display = "block";
+  }
+
+  const emptyMessage = document.getElementById("scheduleEmptyMessage");
+
+  if (emptyMessage) {
+    emptyMessage.style.display = "none";
+  }
+
+  const errorMessage = document.getElementById("errorMessage");
+
+  if (errorMessage) {
+    errorMessage.style.display = "none";
+  }
 }
 
 function hideLoading() {
