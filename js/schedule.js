@@ -34,7 +34,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // 이전에 조회한 일정이 있으면 캐시 사용
     // ------------------------------------
 
-    const cached = getReportScheduleCache(instructorData.instructorNo);
+    const cached = getReportScheduleCache(
+      instructorData.instructorNo,
+      formatScheduleDateKey(selectedScheduleDate),
+    );
 
     console.log("캐시된 출강 일정 사용:", cached);
 
@@ -48,29 +51,139 @@ document.addEventListener("DOMContentLoaded", () => {
     showError("강사 정보를 불러오는 중 오류가 발생했습니다.");
   }
 });
+function getReportScheduleWeekKey(value) {
+  const text = String(value || "").trim();
 
+  if (!text) {
+    return "";
+  }
+
+  const date = new Date(text.includes("T") ? text : `${text}T00:00:00`);
+
+  if (isNaN(date.getTime())) {
+    return "";
+  }
+
+  date.setHours(0, 0, 0, 0);
+
+  const day = date.getDay();
+
+  const diff = day === 0 ? -6 : 1 - day;
+
+  date.setDate(date.getDate() + diff);
+
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
 // ========================================
 // 출강 일정 sessionStorage 캐시
 // ========================================
-
 function saveReportScheduleCache(instructorNo, schedules, role, date) {
   try {
-    const cache = {
+    const currentWeekKey = getReportScheduleWeekKey(date);
+
+    if (!currentWeekKey) {
+      console.warn("출강 일정 캐시 저장 실패: 주차 키를 만들 수 없습니다.", {
+        date,
+      });
+      return;
+    }
+
+    let cacheData = {
       instructorNo: String(instructorNo || "").trim(),
+      weeks: {},
+    };
+
+    const raw = sessionStorage.getItem(REPORT_SCHEDULE_CACHE_KEY);
+
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+
+        // ------------------------------------------------------
+        // 이미 주차별 캐시 구조인 경우 그대로 사용
+        // ------------------------------------------------------
+
+        if (parsed && parsed.weeks && typeof parsed.weeks === "object") {
+          cacheData = parsed;
+
+          // 강사번호가 달라지면 기존 캐시 무시
+          if (
+            String(cacheData.instructorNo || "").trim() !==
+            String(instructorNo || "").trim()
+          ) {
+            cacheData = {
+              instructorNo: String(instructorNo || "").trim(),
+              weeks: {},
+            };
+          }
+        }
+
+        // ------------------------------------------------------
+        // 기존 1주 캐시 구조 → 주차별 구조로 자동 변환
+        // ------------------------------------------------------
+        else if (parsed && Array.isArray(parsed.schedules)) {
+          const oldDate = String(parsed.date || "").trim();
+          const oldWeekKey = getReportScheduleWeekKey(oldDate);
+
+          if (
+            oldWeekKey &&
+            String(parsed.instructorNo || "").trim() ===
+              String(instructorNo || "").trim()
+          ) {
+            cacheData = {
+              instructorNo: String(instructorNo || "").trim(),
+              weeks: {
+                [oldWeekKey]: {
+                  role: normalizeRole(parsed.role),
+                  date: oldDate,
+                  schedules: parsed.schedules,
+                  savedAt: parsed.savedAt || Date.now(),
+                },
+              },
+            };
+          }
+        }
+      } catch (parseError) {
+        console.warn("기존 출강 일정 캐시 변환 실패:", parseError);
+      }
+    }
+
+    if (!cacheData.weeks || typeof cacheData.weeks !== "object") {
+      cacheData.weeks = {};
+    }
+
+    // ------------------------------------------------------
+    // 현재 조회한 주 데이터 저장
+    // ------------------------------------------------------
+
+    cacheData.instructorNo = String(instructorNo || "").trim();
+
+    cacheData.weeks[currentWeekKey] = {
       role: normalizeRole(role),
       date: String(date || "").trim(),
       schedules: Array.isArray(schedules) ? schedules : [],
+      savedAt: Date.now(),
     };
 
-    sessionStorage.setItem(REPORT_SCHEDULE_CACHE_KEY, JSON.stringify(cache));
+    sessionStorage.setItem(
+      REPORT_SCHEDULE_CACHE_KEY,
+      JSON.stringify(cacheData),
+    );
 
-    console.log("출강 일정 캐시 저장:", cache);
+    console.log("[강사 일정] 주간 캐시 저장:", {
+      weekKey: currentWeekKey,
+      schedules: Array.isArray(schedules) ? schedules.length : 0,
+      cachedWeeks: Object.keys(cacheData.weeks).length,
+    });
   } catch (error) {
-    console.error("출강 일정 캐시 저장 오류:", error);
+    console.error("출강 일정 주간 캐시 저장 오류:", error);
   }
 }
-
-function getReportScheduleCache(instructorNo) {
+function getReportScheduleCache(instructorNo, targetDate) {
   try {
     const raw = sessionStorage.getItem(REPORT_SCHEDULE_CACHE_KEY);
 
@@ -78,39 +191,64 @@ function getReportScheduleCache(instructorNo) {
       return null;
     }
 
-    const cache = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
 
-    if (!cache || !Array.isArray(cache.schedules)) {
-      return null;
-    }
+    // ------------------------------------------------------
+    // 강사번호 확인
+    // ------------------------------------------------------
 
     if (
-      String(cache.instructorNo || "").trim() !==
+      String(parsed?.instructorNo || "").trim() !==
       String(instructorNo || "").trim()
     ) {
       return null;
     }
 
-    // 날짜가 오늘과 다르면 캐시 사용하지 않음
-    const today = new Date();
+    const requestedWeekKey = getReportScheduleWeekKey(targetDate);
 
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const day = today.getDate();
-
-    const todayString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
-    if (cache.date !== todayString) {
-      sessionStorage.removeItem(REPORT_SCHEDULE_CACHE_KEY);
-
+    if (!requestedWeekKey) {
       return null;
     }
 
-    return cache;
+    // ------------------------------------------------------
+    // 주차별 캐시
+    // ------------------------------------------------------
+
+    if (parsed && parsed.weeks && typeof parsed.weeks === "object") {
+      const weekCache = parsed.weeks[requestedWeekKey];
+
+      if (!weekCache || !Array.isArray(weekCache.schedules)) {
+        return null;
+      }
+
+      return {
+        instructorNo: String(parsed.instructorNo || "").trim(),
+
+        role: normalizeRole(weekCache.role),
+
+        date: String(weekCache.date || "").trim(),
+
+        schedules: weekCache.schedules,
+
+        savedAt: weekCache.savedAt || 0,
+      };
+    }
+
+    // ------------------------------------------------------
+    // 기존 1주 캐시 호환
+    // ------------------------------------------------------
+
+    if (parsed && Array.isArray(parsed.schedules)) {
+      const oldWeekKey = getReportScheduleWeekKey(parsed.date);
+
+      if (oldWeekKey && oldWeekKey === requestedWeekKey) {
+        return parsed;
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error("출강 일정 캐시 확인 오류:", error);
-
-    sessionStorage.removeItem(REPORT_SCHEDULE_CACHE_KEY);
 
     return null;
   }
@@ -173,69 +311,148 @@ async function loadReportSchedules(data) {
   let hasDisplayedCache = false;
 
   // --------------------------------------------------------
-  // 현재 선택 날짜를 YYYY-MM-DD로 변환
+  // 현재 선택 날짜
   // --------------------------------------------------------
-
   const targetDate = formatScheduleDateKey(selectedScheduleDate);
 
-  // --------------------------------------------------------
-  // 서버 응답 전에는 로딩 표시
-  // --------------------------------------------------------
+  // 이번 조회 대상 주차
+  const targetWeekKey = getReportScheduleWeekKey(targetDate);
 
-  showLoading();
+  // --------------------------------------------------------
+  // 이번 일정 조회 요청의 고유 번호
+  // --------------------------------------------------------
+  const requestId = ++reportScheduleRequestId;
+
+  // --------------------------------------------------------
+  // 이 요청이 지금도 현재 화면을 담당하고 있는지 확인
+  // --------------------------------------------------------
+  function isCurrentViewRequest() {
+    const currentSelectedDate = formatScheduleDateKey(selectedScheduleDate);
+
+    const currentSelectedWeekKey =
+      getReportScheduleWeekKey(currentSelectedDate);
+
+    return (
+      requestId === reportScheduleRequestId &&
+      targetWeekKey === currentSelectedWeekKey
+    );
+  }
 
   try {
     // ------------------------------------------------------
     // 캐시 확인
     // ------------------------------------------------------
+    const cachedSchedules = getReportScheduleCache(
+      data.instructorNo,
+      targetDate,
+    );
 
-    const cachedSchedules = getReportScheduleCache(data.instructorNo);
-
-    console.log("캐시된 출강 일정 사용:", cachedSchedules);
+    console.log("캐시된 출강 일정 확인:", cachedSchedules);
 
     // ------------------------------------------------------
-    // 일정이 있는 캐시만 즉시 표시
-    // 빈 배열 캐시는 표시하지 않음
+    // 캐시 존재 여부
+    //
+    // 일정이 0개인 경우도 정상적인 캐시로 인정
     // ------------------------------------------------------
+    const hasCache =
+      cachedSchedules && Array.isArray(cachedSchedules.schedules);
 
-    if (
-      cachedSchedules &&
-      Array.isArray(cachedSchedules.schedules) &&
-      cachedSchedules.schedules.length > 0
-    ) {
+    // ------------------------------------------------------
+    // 캐시가 없는 경우에만 기존 화면을 비우고 로딩 표시
+    // ------------------------------------------------------
+    if (!hasCache) {
+      reportScheduleLoading = true;
+
+      showLoading();
+
+      // 이전 주 일정 화면 제거
+      const tableWrap = document.getElementById("scheduleTableWrap");
+
+      const tableBody = document.getElementById("scheduleTableBody");
+
+      const cardWrap = document.getElementById("scheduleCardWrap");
+
+      if (tableBody) {
+        tableBody.innerHTML = "";
+      }
+
+      if (tableWrap) {
+        tableWrap.style.display = "none";
+      }
+
+      if (cardWrap) {
+        cardWrap.innerHTML = "";
+        cardWrap.style.display = "none";
+      }
+
+      const oldDesktopReport = document.getElementById(
+        "desktopMainTeacherEndReportRow",
+      );
+
+      if (oldDesktopReport) {
+        oldDesktopReport.remove();
+      }
+
+      const oldMobileReport = document.getElementById(
+        "mainTeacherEndReportArea",
+      );
+
+      if (oldMobileReport) {
+        oldMobileReport.remove();
+      }
+    }
+
+    // ------------------------------------------------------
+    // 캐시가 있으면 즉시 화면 표시
+    //
+    // 일정이 있는 경우뿐 아니라
+    // 일정이 없는 [] 캐시도 즉시 표시
+    // ------------------------------------------------------
+    if (hasCache && isCurrentViewRequest()) {
       allReportSchedules = cachedSchedules.schedules;
 
       hasDisplayedCache = true;
 
+      currentScheduleRole =
+        normalizeRole(cachedSchedules.role) ||
+        currentScheduleRole ||
+        normalizeRole(data.role);
+
+      reportScheduleLoading = false;
+
       updateDateDisplay();
 
+      // 기존 로딩 화면 숨김
       hideLoading();
 
+      // 캐시 일정 즉시 표시
       renderFilteredSchedules();
+
+      console.log("[강사 일정] 캐시 일정 즉시 표시:", {
+        주차: targetWeekKey,
+        일정수: cachedSchedules.schedules.length,
+      });
     }
 
     // ------------------------------------------------------
     // 서버 최신 일정 조회
+    //
+    // 캐시가 있어도 서버 조회는 계속 진행
+    // 단, 캐시가 있으므로 사용자는 기다리지 않음
     // ------------------------------------------------------
-
     console.log("========== 강사 일정 서버 조회 시작 ==========");
 
     const requestStart = performance.now();
 
     const result = await fetch(API_URL, {
       method: "POST",
-
       headers: {
         "Content-Type": "application/json",
       },
-
       body: JSON.stringify({
         action: "getInstructorReportSchedules",
-
         instructorNo: data.instructorNo,
-
-        // 중요:
-        // Date 객체가 아니라 YYYY-MM-DD 문자열 전달
+        // YYYY-MM-DD 문자열 전달
         date: targetDate,
       }),
     });
@@ -250,7 +467,6 @@ async function loadReportSchedules(data) {
     // ------------------------------------------------------
     // HTTP 오류
     // ------------------------------------------------------
-
     if (!result.ok) {
       const errorText = await result.text();
 
@@ -260,24 +476,17 @@ async function loadReportSchedules(data) {
     // ------------------------------------------------------
     // JSON 응답
     // ------------------------------------------------------
-
     const response = await result.json();
 
     console.log("========== 강사 일정 서버 결과 ==========", {
       success: response.success,
-
       message: response.message,
-
       error: response.error,
-
       elapsedMs: response.elapsedMs,
-
       notionPageCount: response.notionPageCount,
-
       scheduleCount: Array.isArray(response.schedules)
         ? response.schedules.length
         : 0,
-
       timing: response.timing,
     });
 
@@ -286,7 +495,6 @@ async function loadReportSchedules(data) {
     // ------------------------------------------------------
     // 서버 작업 실패
     // ------------------------------------------------------
-
     if (!response || response.success !== true) {
       throw new Error(
         response && (response.message || response.error)
@@ -298,29 +506,59 @@ async function loadReportSchedules(data) {
     // ------------------------------------------------------
     // 서버 최신 일정
     // ------------------------------------------------------
-
-    allReportSchedules = Array.isArray(response.schedules)
+    const latestSchedules = Array.isArray(response.schedules)
       ? response.schedules
       : [];
 
     // ------------------------------------------------------
-    // 최신 일정 캐시 저장
-    // 날짜까지 반드시 저장
+    // 최신 역할
     // ------------------------------------------------------
-
     const role = normalizeRole(response.role || data.role);
 
+    // ------------------------------------------------------
+    // 최신 일정 캐시 저장
+    //
+    // []인 경우에도 캐시 저장
+    // ------------------------------------------------------
     saveReportScheduleCache(
       data.instructorNo,
-      allReportSchedules,
+      latestSchedules,
       role,
       targetDate,
     );
 
     // ------------------------------------------------------
-    // 최신 강사번호
+    // 화면 반영 여부 확인
+    //
+    // 1. 더 최신 요청이 시작되었는가?
+    // 2. 현재 선택된 주차가 응답 주차와 같은가?
     // ------------------------------------------------------
+    if (!isCurrentViewRequest()) {
+      console.log("[강사 일정] 화면 반영 대상이 아닌 응답 무시:", {
+        현재요청번호: reportScheduleRequestId,
+        응답요청번호: requestId,
+        응답주차: targetWeekKey,
+        현재선택주차: getReportScheduleWeekKey(
+          formatScheduleDateKey(selectedScheduleDate),
+        ),
+        응답일정수: latestSchedules.length,
+      });
 
+      return;
+    }
+
+    // ------------------------------------------------------
+    // 최신 요청 결과만 화면 데이터에 반영
+    // ------------------------------------------------------
+    allReportSchedules = latestSchedules;
+
+    currentScheduleRole = role;
+
+    reportScheduleLoading = false;
+
+    // ------------------------------------------------------
+    // 강사번호
+    // ------------------------------------------------------
     const instructorNoEl = document.getElementById("instructorNo");
 
     if (instructorNoEl) {
@@ -329,15 +567,8 @@ async function loadReportSchedules(data) {
     }
 
     // ------------------------------------------------------
-    // 최신 역할
-    // ------------------------------------------------------
-
-    currentScheduleRole = role;
-
-    // ------------------------------------------------------
     // 확정 일정 링크
     // ------------------------------------------------------
-
     const confirmedScheduleLink = document.getElementById(
       "confirmedScheduleLink",
     );
@@ -355,14 +586,9 @@ async function loadReportSchedules(data) {
     }
 
     // ------------------------------------------------------
-    // 서버 응답 후에만 로딩 종료
+    // 최신 서버 결과로 화면 갱신
     // ------------------------------------------------------
-
     hideLoading();
-
-    // ------------------------------------------------------
-    // 현재 선택 날짜 기준 최신 일정 렌더링
-    // ------------------------------------------------------
 
     updateDateDisplay();
 
@@ -370,27 +596,48 @@ async function loadReportSchedules(data) {
 
     console.log("========== 최신 일정/보고 현황 화면 갱신 완료 ==========", {
       현재선택날짜: formatScheduleDateKey(selectedScheduleDate),
-
+      현재선택주차: getReportScheduleWeekKey(
+        formatScheduleDateKey(selectedScheduleDate),
+      ),
+      응답주차: targetWeekKey,
       전체일정: allReportSchedules.length,
     });
   } catch (error) {
     console.error("출강 일정 조회 오류:", error);
 
-    // ------------------------------------------------------
-    // 기존 캐시가 화면에 표시된 경우
-    // 캐시 화면 유지
-    // ------------------------------------------------------
+    const isLatestRequest = requestId === reportScheduleRequestId;
 
+    // ------------------------------------------------------
+    // 최신 요청일 때만 로딩 상태 종료
+    // ------------------------------------------------------
+    if (isLatestRequest) {
+      reportScheduleLoading = false;
+    }
+
+    // ------------------------------------------------------
+    // 캐시 화면이 이미 표시된 경우
+    //
+    // 캐시 화면은 그대로 유지
+    // 서버 갱신 실패 때문에 기존 일정까지 없애지 않음
+    // ------------------------------------------------------
     if (hasDisplayedCache) {
-      hideLoading();
+      if (isLatestRequest) {
+        hideLoading();
+      }
 
       return;
     }
 
     // ------------------------------------------------------
-    // 캐시도 없는 경우
+    // 오래된 요청의 오류는 현재 화면에 표시하지 않음
     // ------------------------------------------------------
+    if (!isLatestRequest) {
+      return;
+    }
 
+    // ------------------------------------------------------
+    // 최신 요청 + 캐시 없음
+    // ------------------------------------------------------
     hideLoading();
 
     showError("출강 일정을 불러오는 중 오류가 발생했습니다.");
@@ -2200,28 +2447,31 @@ function normalizeRole(role) {
 }
 
 function showLoading() {
-  const loading = document.getElementById("loadingMessage");
+  const loading = document.getElementById("scheduleLoadingOverlay");
 
   if (loading) {
-    loading.style.display = "block";
+    loading.classList.remove("hidden");
+    loading.setAttribute("aria-hidden", "false");
   }
 
   const emptyMessage = document.getElementById("scheduleEmptyMessage");
-
   if (emptyMessage) {
     emptyMessage.style.display = "none";
   }
 
   const errorMessage = document.getElementById("errorMessage");
-
   if (errorMessage) {
     errorMessage.style.display = "none";
   }
 }
 
 function hideLoading() {
-  const loading = document.getElementById("loadingMessage");
-  if (loading) loading.style.display = "none";
+  const loading = document.getElementById("scheduleLoadingOverlay");
+
+  if (loading) {
+    loading.classList.add("hidden");
+    loading.setAttribute("aria-hidden", "true");
+  }
 }
 
 function showError(message) {
@@ -3738,6 +3988,15 @@ async function previewAssistantClassPhotos(device, index) {
 // 백엔드에서 받은 해당 주의 전체 일정
 let allReportSchedules = [];
 
+// ============================================================
+// 일정 조회 요청 순번
+// 가장 마지막에 시작한 요청만 화면에 반영
+// ============================================================
+let reportScheduleRequestId = 0;
+
+// 현재 일정 조회 중인지 여부
+let reportScheduleLoading = false;
+
 // 현재 선택된 날짜
 let selectedScheduleDate = new Date();
 
@@ -3811,19 +4070,20 @@ function updateDateDisplay() {
       dayOfWeek
     ];
 
-    rangeDisplay.textContent = `${currentMonth}월 ${currentDay}일(${currentWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(일)까지 조회 가능`;
+    rangeDisplay.textContent = `${currentMonth}월 ${currentDay}일(${currentWeekday}) ~ ${sundayMonth}월 ${sundayDay}일(일)`;
   }
   updateDateArrowState();
 }
-
 // ============================================================
 // 이전 / 다음 날짜
 //
-// HTML:
-// onclick="moveDate(-1)"
-// onclick="moveDate(1)"
+// 날짜 이동 제한 없음
 //
-// ※ 이번 주 월요일 ~ 일요일까지만 이동 가능
+// 같은 주:
+//   현재 가지고 있는 일정에서 날짜만 필터링
+//
+// 다른 주:
+//   해당 날짜가 포함된 주의 일정을 서버에서 다시 조회
 // ============================================================
 
 function moveDate(offset) {
@@ -3832,37 +4092,7 @@ function moveDate(offset) {
   current.setHours(0, 0, 0, 0);
 
   // ----------------------------------------------------------
-  // 오늘 날짜
-  // ----------------------------------------------------------
-
-  const today = new Date();
-
-  today.setHours(0, 0, 0, 0);
-
-  // ----------------------------------------------------------
-  // 오늘이 포함된 주의 월요일
-  // ----------------------------------------------------------
-
-  const dayOfWeek = today.getDay();
-
-  const monday = new Date(today);
-
-  monday.setDate(today.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
-
-  monday.setHours(0, 0, 0, 0);
-
-  // ----------------------------------------------------------
-  // 오늘이 포함된 주의 일요일
-  // ----------------------------------------------------------
-
-  const sunday = new Date(monday);
-
-  sunday.setDate(monday.getDate() + 6);
-
-  sunday.setHours(0, 0, 0, 0);
-
-  // ----------------------------------------------------------
-  // 이동할 날짜
+  // 이동할 날짜 계산
   // ----------------------------------------------------------
 
   const targetDate = new Date(current);
@@ -3872,29 +4102,93 @@ function moveDate(offset) {
   targetDate.setHours(0, 0, 0, 0);
 
   // ----------------------------------------------------------
-  // 이번 주 범위 밖이면 이동 차단
+  // 현재 주 / 이동한 날짜의 주 비교
   // ----------------------------------------------------------
 
-  if (targetDate < monday || targetDate > sunday) {
-    return;
-  }
+  const getWeekKey = function (date) {
+    const d = new Date(date);
+
+    d.setHours(0, 0, 0, 0);
+
+    const day = d.getDay();
+
+    const diff = day === 0 ? -6 : 1 - day;
+
+    d.setDate(d.getDate() + diff);
+
+    return [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, "0"),
+      String(d.getDate()).padStart(2, "0"),
+    ].join("-");
+  };
+
+  const currentWeekKey = getWeekKey(current);
+
+  const targetWeekKey = getWeekKey(targetDate);
 
   // ----------------------------------------------------------
-  // 정상 이동
+  // 선택 날짜 변경
   // ----------------------------------------------------------
 
   selectedScheduleDate = targetDate;
 
   updateDateDisplay();
-
   updateDateArrowState();
 
   // ----------------------------------------------------------
-  // 해당 날짜 일정 다시 표시
+  // 같은 주
+  //
+  // 서버 재조회 없이 기존 일정에서 필터링
   // ----------------------------------------------------------
 
-  renderFilteredSchedules();
+  if (currentWeekKey === targetWeekKey) {
+    renderFilteredSchedules();
+    return;
+  }
+
+  // ----------------------------------------------------------
+  // 다른 주
+  //
+  // 해당 주 데이터를 서버에서 다시 조회
+  // ----------------------------------------------------------
+
+  console.log("[강사 날짜 이동] 다른 주 → 새 주 일정 조회", {
+    이전주: currentWeekKey,
+    이동주: targetWeekKey,
+    선택날짜: formatScheduleDateKey(selectedScheduleDate),
+  });
+
+  // ----------------------------------------------------------
+  // 강사 정보 확인
+  // ----------------------------------------------------------
+
+  const storedData = sessionStorage.getItem("instructorData");
+
+  if (!storedData) {
+    showError("강사 정보를 찾을 수 없습니다. 다시 조회해주세요.");
+    return;
+  }
+
+  let instructorData;
+
+  try {
+    instructorData = JSON.parse(storedData);
+  } catch (error) {
+    console.error("[강사 날짜 이동] 강사 정보 파싱 오류:", error);
+
+    showError("강사 정보를 불러오지 못했습니다.");
+
+    return;
+  }
+
+  // ----------------------------------------------------------
+  // 해당 날짜가 포함된 주의 일정 다시 조회
+  // ----------------------------------------------------------
+
+  loadReportSchedules(instructorData);
 }
+
 // ============================================================
 // 날짜 클릭 → 오늘
 // HTML:
@@ -3904,16 +4198,62 @@ function moveDate(offset) {
 function resetToToday() {
   console.log("오늘 날짜로 이동");
 
-  const today = new Date();
+  const current = new Date(selectedScheduleDate);
+  current.setHours(0, 0, 0, 0);
 
+  const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  const currentWeekKey = getReportScheduleWeekKey(
+    formatScheduleDateKey(current),
+  );
+
+  const todayWeekKey = getReportScheduleWeekKey(formatScheduleDateKey(today));
 
   selectedScheduleDate = today;
 
   updateDateDisplay();
+  updateDateArrowState();
 
-  // 오늘 날짜 일정 다시 렌더링
-  renderFilteredSchedules();
+  // ========================================================
+  // 같은 주면 현재 주 일정에서 날짜만 다시 필터링
+  // ========================================================
+
+  if (currentWeekKey === todayWeekKey) {
+    renderFilteredSchedules();
+    return;
+  }
+
+  // ========================================================
+  // 다른 주면 해당 주 캐시/서버 조회
+  // ========================================================
+
+  console.log("[강사 날짜 이동] 오늘로 이동 → 다른 주 일정 조회", {
+    이전주: currentWeekKey,
+    이동주: todayWeekKey,
+    선택날짜: formatScheduleDateKey(selectedScheduleDate),
+  });
+
+  const storedData = sessionStorage.getItem("instructorData");
+
+  if (!storedData) {
+    showError("강사 정보를 찾을 수 없습니다. 다시 조회해주세요.");
+    return;
+  }
+
+  let instructorData;
+
+  try {
+    instructorData = JSON.parse(storedData);
+  } catch (error) {
+    console.error("[강사 날짜 이동] 강사 정보 파싱 오류:", error);
+
+    showError("강사 정보를 불러오지 못했습니다.");
+
+    return;
+  }
+
+  loadReportSchedules(instructorData);
 }
 
 // ============================================================
@@ -3922,7 +4262,22 @@ function resetToToday() {
 
 function renderFilteredSchedules() {
   const targetKey = formatScheduleDateKey(selectedScheduleDate);
+  // ------------------------------------------------------------
+  // 아직 해당 주 일정 조회 중이면
+  // "일정 없음"을 표시하지 않음
+  // ------------------------------------------------------------
 
+  if (reportScheduleLoading) {
+    const emptyMessage = document.getElementById("scheduleEmptyMessage");
+
+    if (emptyMessage) {
+      emptyMessage.style.display = "none";
+    }
+
+    currentReportSchedules = [];
+
+    return;
+  }
   const filteredSchedules = allReportSchedules.filter((schedule) => {
     const scheduleDate = parseDateValue(schedule.date);
 
@@ -3969,6 +4324,10 @@ function renderFilteredSchedules() {
   // ------------------------------------------------------------
 
   if (filteredSchedules.length === 0) {
+    // 일정 조회 중에는 "일정 없음"을 표시하지 않음
+    if (reportScheduleLoading) {
+      return;
+    }
     // 기존 렌더링에서 생성된 추가 영역 제거
     const oldDesktopReport = document.getElementById(
       "desktopMainTeacherEndReportRow",
@@ -4184,76 +4543,16 @@ window.addEventListener("beforeunload", function (event) {
 // ============================================================
 // 날짜 이동 화살표 활성화 / 비활성화
 // ============================================================
-
-// ============================================================
-// 날짜 이동 화살표 활성화 / 비활성화
-// ============================================================
-
 function updateDateArrowState() {
   const prevArrow = document.getElementById("prevDateArrow");
-
   const nextArrow = document.getElementById("nextDateArrow");
 
-  if (!prevArrow && !nextArrow) {
-    return;
-  }
-
-  // ----------------------------------------------------------
-  // 현재 선택 날짜
-  // ----------------------------------------------------------
-
-  const current = new Date(selectedScheduleDate);
-
-  if (isNaN(current.getTime())) {
-    return;
-  }
-
-  current.setHours(0, 0, 0, 0);
-
-  // ----------------------------------------------------------
-  // 오늘이 포함된 주의 월요일
-  // ----------------------------------------------------------
-
-  const today = new Date();
-
-  today.setHours(0, 0, 0, 0);
-
-  const dayOfWeek = today.getDay();
-
-  const monday = new Date(today);
-
-  monday.setDate(today.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek));
-
-  monday.setHours(0, 0, 0, 0);
-
-  // ----------------------------------------------------------
-  // 오늘이 포함된 주의 일요일
-  // ----------------------------------------------------------
-
-  const sunday = new Date(monday);
-
-  sunday.setDate(monday.getDate() + 6);
-
-  sunday.setHours(0, 0, 0, 0);
-
-  // ----------------------------------------------------------
-  // 이동 가능 여부
-  // ----------------------------------------------------------
-
-  const canGoPrevious = current > monday;
-
-  const canGoNext = current < sunday;
-
-  // ----------------------------------------------------------
-  // 회색 비활성 표시
-  // ----------------------------------------------------------
-
   if (prevArrow) {
-    prevArrow.classList.toggle("disabled", !canGoPrevious);
+    prevArrow.classList.remove("disabled");
   }
 
   if (nextArrow) {
-    nextArrow.classList.toggle("disabled", !canGoNext);
+    nextArrow.classList.remove("disabled");
   }
 }
 
@@ -4286,4 +4585,75 @@ function shouldShowEndReportDeadlineWarning(schedule) {
   // 수업일이 오늘보다 이전이면
   // 종료보고 제출기한 경고
   return scheduleDate < today;
+}
+
+/* ============================================================
+   일정 조회 로딩 UI
+   ============================================================ */
+
+let scheduleLoadingTimer = null;
+let scheduleLoadingMessageIndex = 0;
+
+const scheduleLoadingMessages = [
+  "확정된 출강 일정을 확인하고 있습니다.",
+  "일정 정보를 불러오고 있습니다.",
+  "출강 일정을 정리하고 있습니다.",
+  "잠시만 기다려주세요.",
+];
+
+function showScheduleLoading() {
+  const overlay = document.getElementById("scheduleLoadingOverlay");
+
+  const subtitle = document.getElementById("scheduleLoadingSubtitle");
+
+  if (!overlay) {
+    return;
+  }
+
+  scheduleLoadingMessageIndex = 0;
+
+  if (subtitle) {
+    subtitle.textContent = scheduleLoadingMessages[0];
+  }
+
+  overlay.classList.remove("hidden");
+  overlay.setAttribute("aria-hidden", "false");
+
+  /*
+   * 문구를 일정 간격으로 변경
+   * 실제 진행률을 의미하는 것은 아니고
+   * 사용자가 로딩 상태임을 자연스럽게 인식하도록 함
+   */
+
+  clearInterval(scheduleLoadingTimer);
+
+  scheduleLoadingTimer = setInterval(function () {
+    scheduleLoadingMessageIndex =
+      (scheduleLoadingMessageIndex + 1) % scheduleLoadingMessages.length;
+
+    if (subtitle) {
+      subtitle.style.opacity = "0";
+
+      setTimeout(function () {
+        subtitle.textContent =
+          scheduleLoadingMessages[scheduleLoadingMessageIndex];
+
+        subtitle.style.opacity = "1";
+      }, 150);
+    }
+  }, 1800);
+}
+
+function hideScheduleLoading() {
+  const overlay = document.getElementById("scheduleLoadingOverlay");
+
+  if (!overlay) {
+    return;
+  }
+
+  clearInterval(scheduleLoadingTimer);
+  scheduleLoadingTimer = null;
+
+  overlay.classList.add("hidden");
+  overlay.setAttribute("aria-hidden", "true");
 }

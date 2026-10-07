@@ -1967,3 +1967,73 @@ function getSatisfactionBadgeHtml(satisfaction) {
 function initNewReportBadge() {
   updateNewReportBadge();
 }
+/* ============================================================
+   일정 조회 로딩 UI
+   ============================================================ */
+
+let scheduleLoadingTimer = null;
+let scheduleLoadingMessageIndex = 0;
+
+const scheduleLoadingMessages = [
+  "확정된 출강 일정을 확인하고 있습니다.",
+  "일정 정보를 불러오고 있습니다.",
+  "출강 일정을 정리하고 있습니다.",
+  "잠시만 기다려주세요.",
+];
+
+function showScheduleLoading() {
+  const overlay = document.getElementById("scheduleLoadingOverlay");
+
+  const subtitle = document.getElementById("scheduleLoadingSubtitle");
+
+  if (!overlay) {
+    return;
+  }
+
+  scheduleLoadingMessageIndex = 0;
+
+  if (subtitle) {
+    subtitle.textContent = scheduleLoadingMessages[0];
+  }
+
+  overlay.classList.remove("hidden");
+  overlay.setAttribute("aria-hidden", "false");
+
+  /*
+   * 문구를 일정 간격으로 변경
+   * 실제 진행률을 의미하는 것은 아니고
+   * 사용자가 로딩 상태임을 자연스럽게 인식하도록 함
+   */
+
+  clearInterval(scheduleLoadingTimer);
+
+  scheduleLoadingTimer = setInterval(function () {
+    scheduleLoadingMessageIndex =
+      (scheduleLoadingMessageIndex + 1) % scheduleLoadingMessages.length;
+
+    if (subtitle) {
+      subtitle.style.opacity = "0";
+
+      setTimeout(function () {
+        subtitle.textContent =
+          scheduleLoadingMessages[scheduleLoadingMessageIndex];
+
+        subtitle.style.opacity = "1";
+      }, 150);
+    }
+  }, 1800);
+}
+
+function hideScheduleLoading() {
+  const overlay = document.getElementById("scheduleLoadingOverlay");
+
+  if (!overlay) {
+    return;
+  }
+
+  clearInterval(scheduleLoadingTimer);
+  scheduleLoadingTimer = null;
+
+  overlay.classList.add("hidden");
+  overlay.setAttribute("aria-hidden", "true");
+}

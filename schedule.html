@@ -75,8 +75,24 @@
           </div>
 
           <!-- 로딩 -->
-          <div id="loadingMessage" class="loading-message">
-            출강 일정을 불러오는 중입니다...
+          <div
+            id="scheduleLoadingOverlay"
+            class="schedule-loading-overlay"
+            aria-hidden="true"
+          >
+            <div class="schedule-loading-box">
+              <p class="schedule-loading-title">일정을 불러오고 있습니다.</p>
+
+              <p id="scheduleLoadingSubtitle" class="schedule-loading-subtitle">
+                확정된 출강 일정을 확인하고 있습니다.
+              </p>
+
+              <div
+                class="schedule-loading-bar"
+                role="progressbar"
+                aria-label="일정 불러오는 중"
+              ></div>
+            </div>
           </div>
 
           <!-- 오류 -->
@@ -115,6 +131,28 @@
             style="display: none"
           ></div>
         </section>
+        <!-- ============================================================
+             일정 조회 로딩
+             ============================================================ -->
+        <div
+          id="scheduleLoadingOverlay"
+          class="schedule-loading-overlay hidden"
+          aria-hidden="true"
+        >
+          <div class="schedule-loading-box">
+            <p class="schedule-loading-title">일정을 불러오고 있습니다.</p>
+
+            <p id="scheduleLoadingSubtitle" class="schedule-loading-subtitle">
+              확정된 출강 일정을 확인하고 있습니다.
+            </p>
+
+            <div
+              class="schedule-loading-bar"
+              role="progressbar"
+              aria-label="일정 불러오는 중"
+            ></div>
+          </div>
+        </div>
         <!-- 내 확정 일정 전체 보기 -->
         <div class="confirmed-schedule-wrap">
           <a
