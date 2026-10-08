@@ -41,6 +41,7 @@ const ADMIN_UNREAD_REPORT_COUNT_KEY = "adminUnreadReportCount";
 // ==========================================================
 
 document.addEventListener("DOMContentLoaded", function () {
+  clearAppIconBadge();
   initNewReportBadge();
   initAdminAuth();
 });
@@ -435,6 +436,18 @@ function loadAdminDashboardCache() {
 // 5. 조회 실패 시 기존 데이터가 있으면 기존 화면 유지
 // ==========================================================
 
+// ==========================================================
+// 관리자 일정 조회
+//
+// 동작
+// 1. 현재 선택 날짜가 속한 주간 캐시 확인
+// 2. 캐시가 있으면 즉시 화면 표시
+// 3. 캐시가 있으면 로딩 화면을 띄우지 않음
+// 4. 최신 데이터는 백그라운드에서 조회
+// 5. 캐시가 없을 때만 로딩 표시
+// 6. 최신 조회 실패 시 캐시 화면 유지
+// ==========================================================
+
 async function loadAdminData() {
   if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "true") {
     showAdminLogin();
@@ -452,59 +465,76 @@ async function loadAdminData() {
 
   adminSchedulesLoading = true;
 
-  try {
-    // --------------------------------------------------------
-    // 현재 선택 날짜
-    // --------------------------------------------------------
+  // --------------------------------------------------------
+  // 현재 선택 날짜
+  // --------------------------------------------------------
 
-    const year = selectedAdminDate.getFullYear();
+  const year = selectedAdminDate.getFullYear();
 
-    const month = String(selectedAdminDate.getMonth() + 1).padStart(2, "0");
+  const month = String(selectedAdminDate.getMonth() + 1).padStart(2, "0");
 
-    const day = String(selectedAdminDate.getDate()).padStart(2, "0");
+  const day = String(selectedAdminDate.getDate()).padStart(2, "0");
 
-    const targetDate = `${year}-${month}-${day}`;
+  const targetDate = `${year}-${month}-${day}`;
 
-    // --------------------------------------------------------
-    // 1. 현재 선택 날짜가 속한 주간 캐시 확인
-    //
-    // 캐시는 서버 조회 실패 시 기존 데이터 유지용으로도 사용.
-    // 캐시가 있더라도 새 주 이동 시 최신 서버 조회는 진행.
-    // --------------------------------------------------------
+  // --------------------------------------------------------
+  // 캐시 확인
+  // --------------------------------------------------------
 
-    const hasCache = loadAdminDashboardCache();
+  const hasCache = loadAdminDashboardCache();
 
-    const emptyMessage = document.getElementById("emptyMessage");
+  const emptyMessage = document.getElementById("emptyMessage");
 
-    const loading = document.getElementById("loadingMessage");
+  hideError();
 
-    if (hasCache) {
-      // 캐시는 확보만 해두고,
-      // 최신 데이터를 불러오는 동안에는 카드 대신 로딩 문구 표시
-      if (emptyMessage) {
-        emptyMessage.style.display = "none";
-      }
+  // ========================================================
+  // 캐시가 있으면
+  //
+  // 기존 일정 즉시 표시
+  // 로딩 UI 표시하지 않음
+  // ========================================================
 
-      showLoading();
+  if (hasCache) {
+    console.log(
+      "[운영진 대시보드] 캐시 즉시 표시 → 최신 데이터 백그라운드 조회",
+    );
 
-      console.log("[운영진 대시보드] 캐시 확인 → 최신 데이터 조회");
-    } else {
-      // --------------------------------------------------------
-      // 캐시가 없으면 일정 목록을 비우고 로딩 표시
-      // --------------------------------------------------------
-
-      showLoading();
-
-      if (emptyMessage) {
-        emptyMessage.style.display = "none";
-      }
+    if (emptyMessage) {
+      emptyMessage.style.display = "none";
     }
 
-    // --------------------------------------------------------
-    // 3. 최신 데이터 조회
-    // --------------------------------------------------------
+    // 현재 선택 날짜 기준으로
+    // 캐시 일정을 즉시 화면에 표시
+    renderFilteredAdminSchedules();
+
+    // 캐시가 있으므로 사용자에게
+    // 별도의 로딩 메시지를 보여주지 않음
+    hideLoading();
+  }
+
+  // ========================================================
+  // 캐시가 없으면
+  //
+  // 기존 화면 제거 후 로딩 표시
+  // ========================================================
+  else {
+    console.log("[운영진 대시보드] 캐시 없음 → 로딩 표시");
+
+    if (emptyMessage) {
+      emptyMessage.style.display = "none";
+    }
+
+    showLoading();
+  }
+
+  try {
+    // ======================================================
+    // 최신 데이터 조회
+    // ======================================================
 
     console.log("[운영진 대시보드] 최신 데이터 조회:", targetDate);
+
+    const requestStart = performance.now();
 
     const response = await fetch(API_URL, {
       method: "POST",
@@ -515,38 +545,34 @@ async function loadAdminData() {
 
       body: JSON.stringify({
         action: "getAdminSchedules",
+
         date: targetDate,
       }),
     });
 
-    // --------------------------------------------------------
-    // 4. HTTP 확인
-    // --------------------------------------------------------
+    const requestElapsed = Math.round(performance.now() - requestStart);
+
+    console.log("[운영진 대시보드] 서버 조회 완료:", requestElapsed + "ms");
+
+    // ======================================================
+    // HTTP 확인
+    // ======================================================
 
     if (!response.ok) {
       throw new Error("HTTP 오류: " + response.status);
     }
 
-    // --------------------------------------------------------
-    // 5. JSON 변환
-    // --------------------------------------------------------
+    // ======================================================
+    // JSON
+    // ======================================================
 
     const result = await response.json();
+
     console.log("[운영진 API 전체 응답]", result);
 
-    console.log(
-      "[운영진 만족도 데이터]",
-      (Array.isArray(result.schedules) ? result.schedules : []).map(
-        (schedule) => ({
-          facilityName: schedule.facilityName,
-          satisfaction: schedule.satisfaction,
-        }),
-      ),
-    );
-
-    // --------------------------------------------------------
-    // 6. 서버 결과 확인
-    // --------------------------------------------------------
+    // ======================================================
+    // 서버 결과 확인
+    // ======================================================
 
     if (!result || result.success === false) {
       throw new Error(
@@ -556,67 +582,67 @@ async function loadAdminData() {
       );
     }
 
-    // --------------------------------------------------------
-    // 7. 최신 일정 반영
-    // --------------------------------------------------------
+    // ======================================================
+    // 최신 일정
+    // ======================================================
 
     const latestSchedules = Array.isArray(result.schedules)
       ? result.schedules
       : [];
 
-    // --------------------------------------------------------
+    // ======================================================
     // 새 제출 보고 감지
-    // --------------------------------------------------------
+    // ======================================================
 
     detectNewAdminReports(latestSchedules, false);
 
-    // --------------------------------------------------------
-    // 최신 일정 저장
-    // --------------------------------------------------------
+    // ======================================================
+    // 현재 요청 결과 저장
+    // ======================================================
 
     allAdminSchedules = latestSchedules;
 
-    // --------------------------------------------------------
-    // 8. 캐시 갱신
-    // --------------------------------------------------------
+    // ======================================================
+    // 캐시 갱신
+    // ======================================================
 
     saveAdminDashboardCache();
 
-    // --------------------------------------------------------
-    // 9. 서버 조회 완료
-    // --------------------------------------------------------
-
-    adminSchedulesLoading = false;
+    // ======================================================
+    // 최신 데이터 반영
+    // ======================================================
 
     hideLoading();
 
-    // --------------------------------------------------------
-    // 10. 최신 화면 반영
-    // --------------------------------------------------------
-
     renderFilteredAdminSchedules();
 
-    console.log(
-      "[운영진 대시보드] 최신 데이터 갱신 완료:",
-      allAdminSchedules.length,
-    );
+    console.log("[운영진 대시보드] 최신 데이터 갱신 완료:", {
+      일정수: allAdminSchedules.length,
+
+      서버조회시간: requestElapsed + "ms",
+    });
   } catch (error) {
     console.error("운영진 대시보드 조회 오류:", error);
 
-    // --------------------------------------------------------
-    // 캐시가 있으면 기존 화면 유지
-    // --------------------------------------------------------
+    // ======================================================
+    // 캐시가 있으면 기존 캐시 화면 유지
+    // ======================================================
 
     if (hasCache && Array.isArray(allAdminSchedules)) {
-      console.warn("[운영진 대시보드] 최신 조회 실패 → 해당 주 캐시 유지");
+      console.warn("[운영진 대시보드] 최신 조회 실패 → 캐시 화면 유지");
+
       hideLoading();
+
       renderFilteredAdminSchedules();
+
       return;
     }
 
-    // --------------------------------------------------------
-    // 캐시도 없을 때만 오류 표시
-    // --------------------------------------------------------
+    // ======================================================
+    // 캐시도 없으면 오류 표시
+    // ======================================================
+
+    hideLoading();
 
     const list = document.getElementById("adminList");
 
@@ -629,24 +655,13 @@ async function loadAdminData() {
       `;
     }
 
-    // 오류 시에도 "일정 없음"은 숨김
-    const emptyMessage = document.getElementById("emptyMessage");
-
     if (emptyMessage) {
       emptyMessage.style.display = "none";
     }
   } finally {
-    // --------------------------------------------------------
-    // 조회 종료
-    //
-    // renderAdminData()에서 이 값을 확인해서
-    // 조회 중에는 "일정 없음"을 표시하지 않도록 함
-    // --------------------------------------------------------
-
     adminSchedulesLoading = false;
   }
 }
-
 // ==========================================================
 // 선택 날짜의 일정만 필터링해서 렌더링
 //
@@ -918,10 +933,18 @@ function updateSummary(total, complete, incomplete) {
 // ==========================================================
 
 function showLoading() {
-  const loading = document.getElementById("loadingMessage");
+  const loadingMessage = document.getElementById("loadingMessage");
 
-  if (loading) {
-    loading.style.display = "block";
+  if (loadingMessage) {
+    loadingMessage.style.display = "none";
+  }
+
+  const overlay = document.getElementById("adminLoadingOverlay");
+
+  if (overlay) {
+    overlay.style.display = "flex";
+
+    overlay.setAttribute("aria-hidden", "false");
   }
 
   const list = document.getElementById("adminList");
@@ -936,10 +959,18 @@ function showLoading() {
 // ==========================================================
 
 function hideLoading() {
-  const loading = document.getElementById("loadingMessage");
+  const loadingMessage = document.getElementById("loadingMessage");
 
-  if (loading) {
-    loading.style.display = "none";
+  if (loadingMessage) {
+    loadingMessage.style.display = "none";
+  }
+
+  const overlay = document.getElementById("adminLoadingOverlay");
+
+  if (overlay) {
+    overlay.style.display = "none";
+
+    overlay.setAttribute("aria-hidden", "true");
   }
 }
 
@@ -1056,6 +1087,122 @@ function renderAdminData(schedules) {
 }
 
 // ==========================================================
+// 운영진 대시보드 차시 수
+// ==========================================================
+
+function getAdminSessionCount(hours) {
+  const text = String(hours ?? "").trim();
+
+  const sessionMatch = text.match(/(\d+)\s*차시/);
+
+  if (sessionMatch) {
+    return Math.min(3, Math.max(1, Number(sessionMatch[1])));
+  }
+
+  const hourMatch = text.match(/(\d+)\s*시간/);
+
+  if (hourMatch) {
+    return Math.min(3, Math.max(1, Number(hourMatch[1])));
+  }
+
+  const numeric = Number(text);
+
+  if (Number.isFinite(numeric) && numeric >= 1) {
+    return Math.min(3, Math.max(1, Math.round(numeric)));
+  }
+
+  return 1;
+}
+
+// ==========================================================
+// 주강사 / 보조강사 차시별 출석인원 불일치 확인
+// ==========================================================
+
+function getAdminAttendanceMismatch(schedule) {
+  const main = schedule?.mainAttendance || {};
+
+  const assistant = schedule?.assistantAttendance || {};
+
+  const mismatch = {
+    1: false,
+    2: false,
+    3: false,
+  };
+
+  for (let i = 1; i <= 3; i++) {
+    const mainValue = String(main[`attendance${i}`] ?? "").trim();
+
+    const assistantValue = String(assistant[`attendance${i}`] ?? "").trim();
+
+    if (!mainValue || !assistantValue) {
+      continue;
+    }
+
+    const mainNumber = Number(mainValue.replace(/명/g, "").trim());
+
+    const assistantNumber = Number(assistantValue.replace(/명/g, "").trim());
+
+    if (Number.isFinite(mainNumber) && Number.isFinite(assistantNumber)) {
+      mismatch[i] = mainNumber !== assistantNumber;
+    } else {
+      mismatch[i] =
+        mainValue.replace(/명/g, "").trim() !==
+        assistantValue.replace(/명/g, "").trim();
+    }
+  }
+
+  return mismatch;
+}
+
+// ==========================================================
+// 차시별 출석인원 HTML
+// ==========================================================
+
+function getAdminAttendanceHtml(schedule, role, mismatch) {
+  const isMain = role === "main";
+
+  const attendance = isMain
+    ? schedule?.mainAttendance || {}
+    : schedule?.assistantAttendance || {};
+
+  const sessionCount = getAdminSessionCount(schedule?.hours);
+
+  const items = [];
+
+  for (let i = 1; i <= sessionCount; i++) {
+    let value = String(attendance[`attendance${i}`] ?? "").trim();
+
+    if (!value) {
+      continue;
+    }
+
+    value = value.replace(/\s*명\s*$/, "").trim();
+
+    if (!value) {
+      continue;
+    }
+
+    items.push(`
+      <span class="attendance-item ${
+        mismatch?.[i] ? "attendance-mismatch" : ""
+      }">
+        ${i}차시 | ${escapeHtml(value)}명
+      </span>
+    `);
+  }
+
+  if (!items.length) {
+    return "";
+  }
+
+  return `
+    <span class="attendance-wrap">
+      ${items.join("")}
+    </span>
+  `;
+}
+
+// ==========================================================
 // 관리자 일정 카드 생성
 // ==========================================================
 
@@ -1065,6 +1212,7 @@ function createScheduleCard(schedule) {
   }
 
   const card = document.createElement("div");
+
   card.className = "dispatch-card";
 
   // ========================================================
@@ -1124,10 +1272,9 @@ function createScheduleCard(schedule) {
   const assistantEndReportTime = String(
     schedule.assistantEndReportTime || "",
   ).trim();
+
   // ========================================================
-  // 보고 지연 여부
-  // 수업 당일 자정(23:59:59)까지 정상
-  // 다음 날 00:00:00부터 지연
+  // 지연 여부
   // ========================================================
 
   const mainLate =
@@ -1139,6 +1286,7 @@ function createScheduleCard(schedule) {
 
   const assistantEndLate =
     assistantEndComplete && isLateReport(schedule.date, assistantEndReportTime);
+
   // ========================================================
   // 상태 클래스
   // ========================================================
@@ -1156,17 +1304,21 @@ function createScheduleCard(schedule) {
     : "status-incomplete";
 
   // ========================================================
+  // 출석인원 비교
+  // ========================================================
+
+  const attendanceMismatch = getAdminAttendanceMismatch(schedule);
+
+  const mainAttendanceHtml = mainComplete
+    ? getAdminAttendanceHtml(schedule, "main", attendanceMismatch)
+    : "";
+
+  const assistantAttendanceHtml = assistantEndComplete
+    ? getAdminAttendanceHtml(schedule, "assistant", attendanceMismatch)
+    : "";
+
+  // ========================================================
   // 보고 문구
-  //
-  // 중요:
-  // 시간은 전부 박스 밖으로 분리한다.
-  //
-  // 주강사
-  //   [종료보고] 12:04
-  //
-  // 보조강사
-  //   [시작보고] 10:04
-  //   [종료보고] 12:30
   // ========================================================
 
   const mainReportText = mainComplete ? "종료보고" : "종료보고 미제출";
@@ -1185,16 +1337,26 @@ function createScheduleCard(schedule) {
 
   card.innerHTML = `
     <div class="dispatch-header">
-     <div class="dispatch-title">
-  <span class="facility-name">${facilityName}</span>
-  ${satisfactionBadge}
-</div>
+      <div class="dispatch-title">
+        <span class="facility-name">
+          ${facilityName}
+        </span>
+        ${satisfactionBadge}
+      </div>
     </div>
 
     <div class="dispatch-info">
-      <span class="time">${time}</span>
-      <span class="info-divider">|</span>
-      <span>${target}</span>
+      <span class="time">
+        ${time}
+      </span>
+
+      <span class="info-divider">
+        |
+      </span>
+
+      <span>
+        ${target}
+      </span>
     </div>
 
     <div class="teacher-list">
@@ -1226,12 +1388,16 @@ function createScheduleCard(schedule) {
               ${
                 mainComplete && mainEndReportTime
                   ? `
-                    <span class="report-time ${mainLate ? "report-time-late" : ""}">
+                    <span class="report-time ${
+                      mainLate ? "report-time-late" : ""
+                    }">
                       ${escapeHtml(mainEndReportTime)}
                     </span>
                   `
                   : ""
               }
+
+              ${mainAttendanceHtml}
 
             </div>
 
@@ -1275,7 +1441,9 @@ function createScheduleCard(schedule) {
               ${
                 assistantStartComplete && assistantStartReportTime
                   ? `
-                    <span class="report-time ${assistantStartLate ? "report-time-late" : ""}">
+                    <span class="report-time ${
+                      assistantStartLate ? "report-time-late" : ""
+                    }">
                       ${escapeHtml(assistantStartReportTime)}
                     </span>
                   `
@@ -1298,12 +1466,16 @@ function createScheduleCard(schedule) {
               ${
                 assistantEndComplete && assistantEndReportTime
                   ? `
-                    <span class="report-time ${assistantEndLate ? "report-time-late" : ""}">
+                    <span class="report-time ${
+                      assistantEndLate ? "report-time-late" : ""
+                    }">
                       ${escapeHtml(assistantEndReportTime)}
                     </span>
                   `
                   : ""
               }
+
+              ${assistantAttendanceHtml}
 
             </div>
 
@@ -1967,73 +2139,48 @@ function getSatisfactionBadgeHtml(satisfaction) {
 function initNewReportBadge() {
   updateNewReportBadge();
 }
-/* ============================================================
-   일정 조회 로딩 UI
-   ============================================================ */
 
-let scheduleLoadingTimer = null;
-let scheduleLoadingMessageIndex = 0;
+// ==========================================================
+// 앱 아이콘 배지 초기화
+// ==========================================================
+//
+// 운영진 페이지가 열리면
+// Home Screen 앱 아이콘의 배지 숫자를 0으로 초기화한다.
+//
+// Service Worker에 저장된 배지 숫자도 함께 초기화한다.
+// ==========================================================
 
-const scheduleLoadingMessages = [
-  "확정된 출강 일정을 확인하고 있습니다.",
-  "일정 정보를 불러오고 있습니다.",
-  "출강 일정을 정리하고 있습니다.",
-  "잠시만 기다려주세요.",
-];
+async function clearAppIconBadge() {
+  try {
+    // --------------------------------------------------------
+    // 현재 페이지의 App Badge 초기화
+    // --------------------------------------------------------
 
-function showScheduleLoading() {
-  const overlay = document.getElementById("scheduleLoadingOverlay");
+    if (
+      "clearAppBadge" in navigator &&
+      typeof navigator.clearAppBadge === "function"
+    ) {
+      await navigator.clearAppBadge();
 
-  const subtitle = document.getElementById("scheduleLoadingSubtitle");
-
-  if (!overlay) {
-    return;
-  }
-
-  scheduleLoadingMessageIndex = 0;
-
-  if (subtitle) {
-    subtitle.textContent = scheduleLoadingMessages[0];
-  }
-
-  overlay.classList.remove("hidden");
-  overlay.setAttribute("aria-hidden", "false");
-
-  /*
-   * 문구를 일정 간격으로 변경
-   * 실제 진행률을 의미하는 것은 아니고
-   * 사용자가 로딩 상태임을 자연스럽게 인식하도록 함
-   */
-
-  clearInterval(scheduleLoadingTimer);
-
-  scheduleLoadingTimer = setInterval(function () {
-    scheduleLoadingMessageIndex =
-      (scheduleLoadingMessageIndex + 1) % scheduleLoadingMessages.length;
-
-    if (subtitle) {
-      subtitle.style.opacity = "0";
-
-      setTimeout(function () {
-        subtitle.textContent =
-          scheduleLoadingMessages[scheduleLoadingMessageIndex];
-
-        subtitle.style.opacity = "1";
-      }, 150);
+      console.log("[앱 배지] 현재 페이지 앱 아이콘 배지 초기화 완료");
     }
-  }, 1800);
-}
 
-function hideScheduleLoading() {
-  const overlay = document.getElementById("scheduleLoadingOverlay");
+    // --------------------------------------------------------
+    // Service Worker에 저장된 배지 숫자도 0으로 초기화
+    // --------------------------------------------------------
 
-  if (!overlay) {
-    return;
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+
+      if (registration.active) {
+        registration.active.postMessage({
+          type: "CLEAR_BNK_APP_BADGE",
+        });
+
+        console.log("[앱 배지] Service Worker 배지 숫자 초기화 요청");
+      }
+    }
+  } catch (error) {
+    console.warn("[앱 배지] 앱 아이콘 배지 초기화 실패:", error);
   }
-
-  clearInterval(scheduleLoadingTimer);
-  scheduleLoadingTimer = null;
-
-  overlay.classList.add("hidden");
-  overlay.setAttribute("aria-hidden", "true");
 }

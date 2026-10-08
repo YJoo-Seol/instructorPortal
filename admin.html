@@ -161,7 +161,29 @@
            출강 현황
            ==================================================== -->
 
-        <div id="adminList" class="admin-list"></div>
+        <div class="admin-schedule-area">
+          <div
+            id="adminLoadingOverlay"
+            class="admin-loading-overlay"
+            style="display: none"
+            aria-hidden="true"
+          >
+            <div class="admin-loading-box">
+              <div class="admin-loading-title">일정을 불러오고 있습니다.</div>
+
+              <div class="admin-loading-subtitle">
+                최신 출강 일정과 보고 현황을 확인하고 있습니다.
+              </div>
+
+              <div
+                class="admin-loading-bar"
+                aria-label="일정 불러오는 중"
+              ></div>
+            </div>
+          </div>
+
+          <div id="adminList" class="admin-list"></div>
+        </div>
       </section>
     </div>
 

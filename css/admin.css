@@ -1020,3 +1020,185 @@
   color: #dc2626 !important;
   font-weight: 700;
 }
+
+/* ============================================================
+   운영진 대시보드 일정 조회 로딩
+   ============================================================ */
+
+.admin-schedule-area {
+  position: relative;
+}
+
+.admin-loading-overlay {
+  width: 100%;
+  min-height: 220px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+}
+
+.admin-loading-box {
+  width: min(360px, calc(100% - 40px));
+
+  text-align: center;
+}
+
+.admin-loading-title {
+  margin-bottom: 8px;
+
+  font-size: 15px;
+  font-weight: 700;
+
+  color: #406093;
+}
+
+.admin-loading-subtitle {
+  margin-bottom: 18px;
+
+  font-size: 13px;
+  color: #7a8491;
+}
+
+.admin-loading-bar {
+  position: relative;
+
+  width: 100%;
+  height: 6px;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+
+  background: #e9edf3;
+}
+
+.admin-loading-bar::before {
+  content: "";
+
+  position: absolute;
+  top: 0;
+  left: -35%;
+
+  width: 35%;
+  height: 100%;
+
+  border-radius: 999px;
+
+  background: linear-gradient(90deg, #406093 0%, #4c8ce4 50%, #91d06c 100%);
+
+  animation: adminLoadingMove 1.4s ease-in-out infinite;
+}
+
+.admin-loading-bar::after {
+  content: "";
+
+  position: absolute;
+  top: 0;
+  left: -20%;
+
+  width: 20%;
+  height: 100%;
+
+  background: rgba(255, 255, 255, 0.45);
+
+  transform: skewX(-20deg);
+
+  animation: adminLoadingShine 1.4s linear infinite;
+}
+
+@keyframes adminLoadingMove {
+  0% {
+    left: -35%;
+  }
+
+  50% {
+    left: 55%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes adminLoadingShine {
+  0% {
+    left: -20%;
+  }
+
+  100% {
+    left: 120%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-loading-bar::before,
+  .admin-loading-bar::after {
+    animation: none;
+  }
+
+  .admin-loading-bar::before {
+    left: 0;
+    width: 100%;
+  }
+}
+/* ============================================================
+   운영진 대시보드 차시별 출석현황
+   ============================================================ */
+
+.report-item,
+.assistant-report-item {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.attendance-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-left: 2px;
+}
+
+.attendance-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 26px;
+
+  padding: 4px 7px;
+
+  border-radius: 5px;
+
+  background: #f3f4f6;
+  color: #555;
+
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+/* 주강사 / 보조강사 출석인원 불일치 */
+.attendance-mismatch {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+@media screen and (max-width: 380px) {
+  .attendance-wrap {
+    gap: 3px;
+  }
+
+  .attendance-item {
+    min-height: 24px;
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+}
