@@ -1,5 +1,31 @@
 const API_URL = "https://instructor-api.seol7518.workers.dev/";
 const REPORT_SCHEDULE_CACHE_KEY = "currentReportSchedulesCache";
+// ========================================
+// 보고서 중복 제출 방지
+// 같은 일정에 대한 동시 제출 요청 차단
+// ========================================
+
+const reportSubmitLocks = new Set();
+
+function acquireReportSubmitLock(index, device, schedule) {
+  const pageId = String(schedule?.pageId || "").trim();
+  const lockKey = pageId || `index_${index}`;
+
+  if (reportSubmitLocks.has(lockKey)) {
+    console.log("[보고서 중복 제출 차단]", lockKey);
+
+    return null;
+  }
+
+  reportSubmitLocks.add(lockKey);
+  return lockKey;
+}
+
+function releaseReportSubmitLock(lockKey) {
+  if (lockKey) {
+    reportSubmitLocks.delete(lockKey);
+  }
+}
 
 // ========================================
 // 역할별 Notion 확정 일정 페이지
@@ -1826,27 +1852,42 @@ function handleMainTeacherPhotoSelect(index, device, input) {
 // ========================================
 // 주강사 종료보고 제출
 // ========================================
-
 async function submitMainTeacherEndReport(index, device) {
+  let lockKey = null;
+
   try {
     const schedule = currentReportSchedules[index];
+
     if (!schedule) {
       alert("선택한 출강 일정 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    // ==========================================================
+    // 중복 제출 잠금
+    // ==========================================================
+
+    lockKey = acquireReportSubmitLock(index, device, schedule);
+
+    if (!lockKey) {
       return;
     }
 
     const instructorData = JSON.parse(
       sessionStorage.getItem("instructorData") || "null",
     );
+
     if (!instructorData) {
       alert("강사 정보를 찾을 수 없습니다. 다시 로그인해주세요.");
       return;
     }
 
     const prefix = `mainTeacherEnd_${device}_${index}`;
+
     const hoursText = String(schedule.hours || "").trim();
 
     let sessionCount = 1;
+
     if (
       hoursText.includes("3차시") ||
       hoursText === "3" ||
@@ -1863,24 +1904,31 @@ async function submitMainTeacherEndReport(index, device) {
 
     const attendance1 =
       document.getElementById(`${prefix}_attendance1`)?.value.trim() || "";
+
     const attendance2 =
       document.getElementById(`${prefix}_attendance2`)?.value.trim() || "";
+
     const attendance3 =
       document.getElementById(`${prefix}_attendance3`)?.value.trim() || "";
+
     const storage =
       document.getElementById(`${prefix}_storage`)?.value.trim() || "";
+
     const otherNote =
       document.getElementById(`${prefix}_otherNote`)?.value.trim() || "";
+
     const photoInput = document.getElementById(`${prefix}_photo`);
 
     if (!attendance1) {
       alert("1차시 출석 인원을 입력해주세요.");
       return;
     }
+
     if (sessionCount >= 2 && !attendance2) {
       alert("2차시 출석 인원을 입력해주세요.");
       return;
     }
+
     if (sessionCount >= 3 && !attendance3) {
       alert("3차시 출석 인원을 입력해주세요.");
       return;
@@ -1933,37 +1981,58 @@ async function submitMainTeacherEndReport(index, device) {
 
     const payload = {
       action: "saveMainTeacherEndReport",
+
       instructorNo: instructorData.instructorNo || "",
+
       pageId: schedule.pageId || "",
+
       attendance1: attendance1,
+
       attendance2: sessionCount >= 2 ? attendance2 : "",
+
       attendance3: sessionCount >= 3 ? attendance3 : "",
+
       storage: storage,
+
       otherNote: otherNote,
+
       photoData: base64,
+
       photoName: file.name,
     };
 
     const submitButton = document.getElementById(`${prefix}_submit`);
+
     if (submitButton) {
       submitButton.disabled = true;
+
       submitButton.textContent = "제출 중...";
     }
 
     console.log("========== 주강사 종료보고 서버 요청 시작 ==========");
+
     console.log("서버 요청:", {
       instructorNo: payload.instructorNo,
+
       pageId: payload.pageId,
+
       hasPhotoData: !!payload.photoData,
+
       photoSize: payload.photoData ? payload.photoData.length : 0,
     });
 
     const requestStart = performance.now();
+
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
+
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+
       body: JSON.stringify(payload),
     });
+
     console.log(
       "========== 주강사 종료보고 서버 응답 도착 ==========",
       Math.round(performance.now() - requestStart) + "ms",
@@ -1972,9 +2041,12 @@ async function submitMainTeacherEndReport(index, device) {
     );
 
     const result = await response.json();
+
     console.log("========== 주강사 종료보고 서버 결과 ==========", {
       success: result.success,
+
       message: result.message,
+
       timing: result.timing || null,
     });
 
@@ -1983,12 +2055,16 @@ async function submitMainTeacherEndReport(index, device) {
         hideReportSubmitLoading();
 
         alert(result.message);
+
         schedule.myReport = schedule.myReport || {};
+
         schedule.myReport.end = true;
+
         renderScheduleList(
           currentReportSchedules,
           normalizeRole(instructorData.role),
         );
+
         return;
       }
 
@@ -1998,12 +2074,15 @@ async function submitMainTeacherEndReport(index, device) {
 
       if (submitButton) {
         submitButton.disabled = false;
+
         submitButton.textContent = "종료보고 제출";
       }
+
       return;
     }
 
     schedule.myReport = schedule.myReport || {};
+
     schedule.myReport.end = true;
 
     hideReportSubmitLoading();
@@ -2013,6 +2092,7 @@ async function submitMainTeacherEndReport(index, device) {
     sessionStorage.removeItem(REPORT_SCHEDULE_CACHE_KEY);
 
     window.currentMainTeacherEndReportSchedule = null;
+
     renderScheduleList(
       currentReportSchedules,
       normalizeRole(instructorData.role),
@@ -2021,7 +2101,20 @@ async function submitMainTeacherEndReport(index, device) {
     hideReportSubmitLoading();
 
     console.error("주강사 종료보고 제출 오류:", error);
+
     alert("종료보고 제출 중 오류가 발생했습니다.\n\n" + error.message);
+
+    const prefix = `mainTeacherEnd_${device}_${index}`;
+
+    const submitButton = document.getElementById(`${prefix}_submit`);
+
+    if (submitButton) {
+      submitButton.disabled = false;
+
+      submitButton.textContent = "종료보고 제출";
+    }
+  } finally {
+    releaseReportSubmitLock(lockKey);
   }
 }
 
@@ -2154,78 +2247,91 @@ async function handleStartPhotoSelect(index, device, input) {
   }
 }
 
-// ==========================================================
+// ============================================================
 // 보조강사 시작보고 제출
-// ==========================================================
+// ============================================================
 async function submitAssistantStartReport(index, device) {
   const totalStart = performance.now();
+  let lockKey = null;
 
   console.log("========== 보조강사 시작보고 제출 시작 ==========");
 
-  const schedule = currentReportSchedules[index];
-
-  if (!schedule) {
-    alert("일정 정보를 찾을 수 없습니다.");
-    return;
-  }
-
-  const storedData = sessionStorage.getItem("instructorData");
-
-  if (!storedData) {
-    alert("강사 정보를 찾을 수 없습니다. 다시 조회해주세요.");
-    return;
-  }
-
-  let instructorData;
-
   try {
-    instructorData = JSON.parse(storedData);
-  } catch (error) {
-    alert("강사 정보를 불러오지 못했습니다.");
-    return;
-  }
+    const schedule = currentReportSchedules[index];
 
-  const photoInputId =
-    device === "desktop"
-      ? `desktopStartPhoto_${index}`
-      : `assistantStartPhoto_mobile_${index}`;
+    if (!schedule) {
+      alert("일정 정보를 찾을 수 없습니다.");
+      return;
+    }
 
-  const submitButtonId =
-    device === "desktop"
-      ? `desktopStartSubmit_${index}`
-      : `assistantStartSubmit_mobile_${index}`;
+    // ==========================================================
+    // 중복 제출 잠금
+    // ==========================================================
 
-  const photoInput = document.getElementById(photoInputId);
-  const submitButton = document.getElementById(submitButtonId);
+    lockKey = acquireReportSubmitLock(index, device, schedule);
 
-  if (!photoInput || !photoInput.files || photoInput.files.length === 0) {
-    alert("출강 사진을 선택해주세요.");
-    return;
-  }
+    if (!lockKey) {
+      return;
+    }
 
-  const originalFile = photoInput.files[0];
+    const storedData = sessionStorage.getItem("instructorData");
 
-  if (!isImageFile(originalFile)) {
-    alert("이미지 파일만 선택할 수 있습니다.");
-    return;
-  }
+    if (!storedData) {
+      alert("강사 정보를 찾을 수 없습니다. 다시 조회해주세요.");
+      return;
+    }
 
-  // 이미 다른 보고서를 제출 중이면 중복 제출 방지
-  if (reportSubmitLoading) {
-    return;
-  }
+    let instructorData;
 
-  showReportSubmitLoading("보조강사 시작보고를 제출하고 있습니다.");
+    try {
+      instructorData = JSON.parse(storedData);
+    } catch (error) {
+      alert("강사 정보를 불러오지 못했습니다.");
+      return;
+    }
 
-  if (submitButton) {
-    submitButton.disabled = true;
-    submitButton.textContent = "제출 중...";
-  }
+    const photoInputId =
+      device === "desktop"
+        ? `desktopStartPhoto_${index}`
+        : `assistantStartPhoto_mobile_${index}`;
 
-  try {
-    // HEIC/HEIF는 선택 단계에서 이미 변환되었으면
-    // 변환된 파일을 사용하고,
-    // 아직 변환되지 않았다면 여기서 한 번만 변환
+    const submitButtonId =
+      device === "desktop"
+        ? `desktopStartSubmit_${index}`
+        : `assistantStartSubmit_mobile_${index}`;
+
+    const photoInput = document.getElementById(photoInputId);
+
+    const submitButton = document.getElementById(submitButtonId);
+
+    if (!photoInput || !photoInput.files || photoInput.files.length === 0) {
+      alert("출강 사진을 선택해주세요.");
+      return;
+    }
+
+    const originalFile = photoInput.files[0];
+
+    if (!isImageFile(originalFile)) {
+      alert("이미지 파일만 선택할 수 있습니다.");
+      return;
+    }
+
+    // 이미 다른 보고서를 제출 중이면 중복 제출 방지
+    if (reportSubmitLoading) {
+      return;
+    }
+
+    showReportSubmitLoading("보조강사 시작보고를 제출하고 있습니다.");
+
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "제출 중...";
+    }
+
+    // ==========================================================
+    // HEIC/HEIF 변환
+    // ==========================================================
+
     const file =
       photoInput.__preparedFile || (await prepareUploadFile(originalFile));
 
@@ -2250,9 +2356,11 @@ async function submitAssistantStartReport(index, device) {
 
     const response = await fetch(API_URL, {
       method: "POST",
+
       headers: {
         "Content-Type": "text/plain;charset=UTF-8",
       },
+
       body: JSON.stringify({
         action: "saveAssistantStartReport",
 
@@ -2319,7 +2427,9 @@ async function submitAssistantStartReport(index, device) {
 
     console.log("========== 보조강사 시작보고 서버 결과 ==========", {
       success: result.success,
+
       message: result.message,
+
       timing: result.timing,
     });
 
@@ -2345,13 +2455,13 @@ async function submitAssistantStartReport(index, device) {
     }
 
     // ==========================================================
-    // 제출 성공 → 로딩 종료
+    // 7. 제출 성공 → 로딩 종료
     // ==========================================================
 
     hideReportSubmitLoading();
 
     // ==========================================================
-    // 7. 화면 상태 업데이트
+    // 8. 화면 상태 업데이트
     // ==========================================================
 
     schedule.myReport = schedule.myReport || {};
@@ -2365,7 +2475,7 @@ async function submitAssistantStartReport(index, device) {
     renderMobileCards(currentReportSchedules, role);
 
     // ==========================================================
-    // 8. 전체 시간
+    // 9. 전체 시간
     // ==========================================================
 
     const totalElapsed = performance.now() - totalStart;
@@ -2375,7 +2485,6 @@ async function submitAssistantStartReport(index, device) {
       Math.round(totalElapsed) + "ms",
     );
   } catch (error) {
-    // 오류 발생 시 로딩 종료
     hideReportSubmitLoading();
 
     const errorElapsed = performance.now() - totalStart;
@@ -2389,10 +2498,23 @@ async function submitAssistantStartReport(index, device) {
 
     alert(error.message || "시작보고 제출에 실패했습니다.");
 
+    const schedule = currentReportSchedules[index];
+
+    const prefix = `assistantStart_${device}_${index}`;
+
+    const submitButton = document.getElementById(
+      device === "desktop"
+        ? `desktopStartSubmit_${index}`
+        : `assistantStartSubmit_mobile_${index}`,
+    );
+
     if (submitButton) {
       submitButton.disabled = false;
+
       submitButton.textContent = "시작보고 제출";
     }
+  } finally {
+    releaseReportSubmitLock(lockKey);
   }
 }
 
@@ -3180,11 +3302,25 @@ function updateAssistantAttendanceTotal(device, index, session) {
 // 보조강사 종료보고 제출
 // ============================================================
 async function submitAssistantEndReport(index, device) {
+  let lockKey = null;
+
   try {
     const schedule = currentReportSchedules[index];
 
     if (!schedule) {
       alert("선택한 출강 일정 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    // ==========================================================
+    // 중복 제출 잠금
+    //
+    // 사진 압축 / 파일 변환보다 먼저 잠근다.
+    // ==========================================================
+
+    lockKey = acquireReportSubmitLock(index, device, schedule);
+
+    if (!lockKey) {
       return;
     }
 
@@ -3203,8 +3339,11 @@ async function submitAssistantEndReport(index, device) {
 
     console.log("[보조강사 종료보고 제출 차시 확인]", {
       pageId: schedule.pageId,
+
       facilityName: schedule.facilityName,
+
       hours: schedule.hours,
+
       sessionCount: sessionCount,
     });
 
@@ -3233,6 +3372,7 @@ async function submitAssistantEndReport(index, device) {
     function calculateTotal(session, attendance, absence) {
       if (attendance === "" || absence === "") {
         alert(`${session}차시 출석과 결석 인원을 모두 입력해주세요.`);
+
         return null;
       }
 
@@ -3242,11 +3382,13 @@ async function submitAssistantEndReport(index, device) {
 
       if (!Number.isInteger(attNum) || !Number.isInteger(absNum)) {
         alert(`${session}차시 출석과 결석 인원은 정수로 입력해주세요.`);
+
         return null;
       }
 
       if (attNum < 0 || absNum < 0) {
         alert(`${session}차시 출석과 결석 인원은 0명 이상이어야 합니다.`);
+
         return null;
       }
 
@@ -3254,6 +3396,7 @@ async function submitAssistantEndReport(index, device) {
         alert(
           `${session}차시 출석/결석 인원은 각각 최대 12명까지 입력 가능합니다.`,
         );
+
         return null;
       }
 
@@ -3261,6 +3404,7 @@ async function submitAssistantEndReport(index, device) {
 
       if (total > 12) {
         alert(`${session}차시 출결 총원은 최대 12명까지 입력할 수 있습니다.`);
+
         return null;
       }
 
@@ -3300,11 +3444,11 @@ async function submitAssistantEndReport(index, device) {
       document.getElementById(`${prefix}_reason`)?.value.trim() || "";
 
     // ============================================================
-    // 보조강사 종료보고 - 프로그램 사진
-    // 누적 선택된 사진 전체 제출
+    // 프로그램 사진
     // ============================================================
 
     const photoKey = `${device}_${index}`;
+
     const classPhotoInput = document.getElementById(`${prefix}_classPhotos`);
 
     if (classPhotoInput?.__processingClassPhotos) {
@@ -3354,7 +3498,9 @@ async function submitAssistantEndReport(index, device) {
 
       photoDataList.push({
         data: compressedPhoto.base64,
+
         name: compressedPhoto.fileName,
+
         type: compressedPhoto.fileType,
       });
     }
@@ -3420,6 +3566,7 @@ async function submitAssistantEndReport(index, device) {
 
     if (submitButton) {
       submitButton.disabled = true;
+
       submitButton.textContent = "제출 중...";
     }
 
@@ -3567,6 +3714,7 @@ async function submitAssistantEndReport(index, device) {
 
       if (submitButton) {
         submitButton.disabled = false;
+
         submitButton.textContent = "종료보고 제출";
       }
 
@@ -3631,8 +3779,11 @@ async function submitAssistantEndReport(index, device) {
 
     if (submitButton) {
       submitButton.disabled = false;
+
       submitButton.textContent = "종료보고 제출";
     }
+  } finally {
+    releaseReportSubmitLock(lockKey);
   }
 }
 
