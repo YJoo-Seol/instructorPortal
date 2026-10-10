@@ -522,65 +522,177 @@ input[type="file"]::file-selector-button:hover {
 	width: 100%;
 	margin-bottom: 12px;
 }
-
 /* ============================================================
-   10. 출결 현황 세션
+   10. 종료보고 출결 현황
+   주강사·보조강사 차시 제목 및 불릿 통일
    ============================================================ */
 
+/* 출결 목록 공통 */
+.main-teacher-attendance-list,
 .assistant-attendance-list {
 	width: 100%;
 	margin-top: 8px;
+	box-sizing: border-box;
 }
 
-.assistant-attendance-session {
+/* 1. 출석 현황 제목 */
+.main-teacher-attendance-list > label {
+	display: block;
 	width: 100%;
+	margin-bottom: 8px;
+	font-size: 14px;
+	font-weight: 700;
+	color: #374151;
+	text-align: left;
+	box-sizing: border-box;
+}
+
+/* ============================================================
+   차시별 항목 공통
+   ============================================================ */
+
+/* 주강사 차시 영역
+   기존 main-teacher-end-report-field의 가로 정렬을 해제 */
+.main-teacher-end-report-form
+	.main-teacher-end-report-field.main-teacher-attendance-session {
+	display: block;
+	width: 100%;
+	margin: 0;
 	padding: 10px 0 12px;
 	border-bottom: 1px solid #e2e7ed;
 	box-sizing: border-box;
 }
 
+/* 보조강사 차시 영역 */
+.assistant-end-report-form .assistant-attendance-session {
+	display: block;
+	width: 100%;
+	margin: 0;
+	padding: 10px 0 12px;
+	border-bottom: 1px solid #e2e7ed;
+	box-sizing: border-box;
+}
+
+/* 마지막 차시의 하단 구분선 제거 */
+.main-teacher-attendance-session:last-child,
 .assistant-attendance-session:last-child {
 	border-bottom: none;
 }
 
+/* ============================================================
+   차시 제목
+   ============================================================ */
+
+/* 주강사·보조강사 제목 정렬 통일 */
+.main-teacher-attendance-session-title,
 .assistant-attendance-session-title {
 	display: flex;
 	align-items: center;
 	gap: 7px;
-	margin-bottom: 8px;
+	width: 100%;
+	margin: 0 0 8px;
 	font-size: 13px;
 	font-weight: 600;
+	line-height: 1.5;
+	color: #374151;
+	text-align: left;
+	box-sizing: border-box;
+}
+
+/* 차시 제목에만 불릿 표시 */
+.main-teacher-end-report-form .main-teacher-attendance-session-title::before,
+.assistant-end-report-form .assistant-attendance-session-title::before {
+	content: "•";
+	display: inline-block;
+	flex: 0 0 auto;
+	color: #406093;
+	font-size: 18px;
+	line-height: 1;
+}
+
+/* 대상 텍스트 */
+.main-teacher-attendance-session-title span,
+.assistant-attendance-session-title span {
+	font-weight: 500;
 	color: #374151;
 }
+
+/* ============================================================
+   주강사 출석 입력
+   ============================================================ */
+
+/* 주강사는 출석 입력 하나를 전체 너비로 표시 */
+.main-teacher-attendance-input-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 8px;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.main-teacher-attendance-input-group {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+}
+
+.main-teacher-attendance-input-group label {
+	margin-bottom: 4px;
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1.4;
+	color: #7a8491;
+	text-align: left;
+}
+
+.main-teacher-attendance-input-group input[type="number"] {
+	display: block;
+	width: 100%;
+	height: 44px;
+	min-height: 44px;
+	margin: 0;
+	padding: 0 12px;
+	border: 1px solid #d5dbe3;
+	border-radius: 6px;
+	background: #fff;
+	font-family: inherit;
+	font-size: 16px;
+	line-height: normal;
+	text-align: center;
+	box-sizing: border-box;
+	appearance: textfield;
+	-webkit-appearance: none;
+}
+
+/* ============================================================
+   보조강사 출석·결석·총원 입력
+   ============================================================ */
 
 .assistant-attendance-input-row {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 8px;
 	width: 100%;
+	box-sizing: border-box;
 }
 
 .assistant-attendance-input-group {
 	display: flex;
 	flex-direction: column;
+	min-width: 0;
+	box-sizing: border-box;
 }
 
 .assistant-attendance-input-group label {
 	margin-bottom: 4px;
 	font-size: 12px;
+	font-weight: 400;
+	line-height: 1.4;
 	color: #7a8491;
 	text-align: center;
 }
-
-/* .assistant-attendance-input-group input[type="number"],
-.assistant-attendance-total {
-	width: 100%;
-	height: 44px;
-	border-radius: 6px;
-	font-size: 16px;
-	text-align: center;
-	box-sizing: border-box;
-} */
 
 .assistant-end-report-form
 	.assistant-attendance-input-group
@@ -590,24 +702,28 @@ input[type="file"]::file-selector-button:hover {
 	width: 100%;
 	height: 44px;
 	min-height: 44px;
+	margin: 0;
 	padding: 0 12px;
+	border: 1px solid #d5dbe3;
 	border-radius: 6px;
+	font-family: inherit;
 	font-size: 16px;
 	line-height: normal;
 	text-align: center;
 	box-sizing: border-box;
 }
 
-.assistant-attendance-input-group input[type="number"] {
-	border: 1px solid #d5dbe3;
+.assistant-end-report-form
+	.assistant-attendance-input-group
+	input.assistant-attendance-number-input {
+	background: #fff;
 	appearance: textfield;
+	-webkit-appearance: none;
 }
 
-.assistant-attendance-total {
-	display: flex;
+.assistant-end-report-form .assistant-attendance-total {
 	align-items: center;
 	justify-content: center;
-	border: 1px solid #d5dbe3;
 	background: #f5f7fa;
 	font-weight: 600;
 	color: #374151;
@@ -780,8 +896,20 @@ input[type="file"]::file-selector-button:hover {
 		flex: 0 0 auto;
 		width: 100%;
 		padding-top: 0;
-		font-size: 13px;
+		font-size: 15px;
 		text-align: left;
+		font-weight: 700;
+		color: #406093;
+	}
+
+	.main-teacher-end-report-form .main-teacher-attendance-list > label {
+		flex: 0 0 auto;
+		width: 100%;
+		padding-top: 0;
+		font-size: 15px;
+		text-align: left;
+		font-weight: 700;
+		color: #406093;
 	}
 
 	.main-teacher-end-report-form

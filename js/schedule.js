@@ -327,6 +327,30 @@ function updateScheduleHeader(role, targetDate) {
 		}
 	}
 }
+// ========================================
+// 주강사·보조강사 종료보고 공통 대상 처리
+// ========================================
+
+function getEndReportTargetForSession(schedule, session) {
+	const targetText = String(schedule?.target || "").trim();
+
+	const targets = targetText
+		.split(",")
+		.map((target) => target.trim())
+		.filter(Boolean);
+
+	if (targets.length === 0) {
+		return "";
+	}
+
+	// 대상이 하나면 모든 차시에 동일하게 적용
+	if (targets.length === 1) {
+		return targets[0];
+	}
+
+	// 대상이 여러 개면 차시별로 순서대로 적용
+	return targets[session - 1] || "";
+}
 
 // ============================================================
 // Notion 운영진 DB 일정 + 보고 현황 조회
@@ -1611,7 +1635,6 @@ function openMainTeacherEndReport(schedule) {
 		});
 	}, 50);
 }
-
 // ========================================
 // 주강사 종료보고 입력폼
 // ========================================
@@ -1624,6 +1647,7 @@ function renderMainTeacherEndReportForm(index, device) {
 	const hoursText = String(schedule.hours || "").trim();
 
 	let sessionCount = 1;
+
 	if (
 		hoursText.includes("3차시") ||
 		hoursText === "3" ||
@@ -1638,29 +1662,50 @@ function renderMainTeacherEndReportForm(index, device) {
 		sessionCount = 2;
 	}
 
+	// 차시별 출석 입력란 생성
 	let attendanceFields = "";
+
 	for (let i = 1; i <= sessionCount; i++) {
+		const target = getEndReportTargetForSession(schedule, i);
+		const safeTarget = escapeHtml(target);
+
 		attendanceFields += `
-      <div class="main-teacher-end-report-field">
-        <label for="${prefix}_attendance${i}">${i}차시 출석</label>
-        <input
-          type="number"
-          id="${prefix}_attendance${i}"
-          min="0"
-          max="12"
-          inputmode="numeric"
-          placeholder="출석 인원"
-        />
+      <div class="main-teacher-end-report-field main-teacher-attendance-session">
+
+        <div class="main-teacher-attendance-session-title">
+          ${i}차시 <span>${safeTarget}</span>
+        </div>
+
+        <div class="main-teacher-attendance-input-row">
+          <div class="main-teacher-attendance-input-group">
+            <!-- <label for="${prefix}_attendance${i}">출석</label> -->
+            <input
+              type="number"
+              id="${prefix}_attendance${i}"
+              min="0"
+              max="12"
+              step="1"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="출석 인원"
+            />
+          </div>
+        </div>
+
       </div>
     `;
 	}
 
 	return `
     <div class="main-teacher-end-report-form">
-      ${attendanceFields}
+
+      <div class="main-teacher-attendance-list">
+        <label>1. 출석 현황</label>
+        ${attendanceFields}
+      </div>
 
       <div class="main-teacher-end-report-field">
-        <label for="${prefix}_storage">출강부 보관</label>
+        <label for="${prefix}_storage">2. 출강부 보관</label>
         <textarea
           id="${prefix}_storage"
           rows="3"
@@ -1669,7 +1714,8 @@ function renderMainTeacherEndReportForm(index, device) {
       </div>
 
       <div class="main-teacher-end-report-field">
-        <label for="${prefix}_photo">출강부 위치</label>
+        <label for="${prefix}_photo">3. 출강부 위치</label>
+
         <div class="file-upload-area">
           <input
             type="file"
@@ -1677,6 +1723,7 @@ function renderMainTeacherEndReportForm(index, device) {
             accept="image/*,.heic,.heif"
             onchange="handleSinglePhotoSelect('${prefix}_preview', '${prefix}_previewImage', this)"
           />
+
           <div
             id="${prefix}_preview"
             class="assistant-document-preview"
@@ -1692,7 +1739,7 @@ function renderMainTeacherEndReportForm(index, device) {
       </div>
 
       <div class="main-teacher-end-report-field">
-        <label for="${prefix}_otherNote">기타 특이사항</label>
+        <label for="${prefix}_otherNote">4. 기타 특이사항</label>
         <textarea
           id="${prefix}_otherNote"
           rows="3"
@@ -1710,10 +1757,10 @@ function renderMainTeacherEndReportForm(index, device) {
           종료보고 제출
         </button>
       </div>
+
     </div>
   `;
 }
-
 // ========================================
 // 단일 파일 미리보기 (공용)
 // ========================================
@@ -3083,35 +3130,28 @@ function renderAssistantEndReportForm(index, device) {
 		hours: schedule.hours,
 		sessionCount: sessionCount,
 	});
-	const targetText = String(schedule.target || "").trim();
-	const targetParts = targetText.split(",").map((v) => String(v || "").trim());
-
-	function getSessionTarget(session) {
-		if (targetParts.length >= session) return targetParts[session - 1];
-		return session === 1 ? targetText : "";
-	}
 
 	let sessionHtml = "";
+
 	for (let session = 1; session <= sessionCount; session++) {
-		const sessionTarget = getSessionTarget(session);
-		const safeTarget = sessionTarget
-			.replace(/&/g, "&amp;")
-			.replace(/</g, "&lt;")
-			.replace(/>/g, "&gt;")
-			.replace(/"/g, "&quot;");
+		// 주강사와 동일한 공통 대상 처리 함수 사용
+		const target = getEndReportTargetForSession(schedule, session);
+		const safeTarget = escapeHtml(target);
 
 		sessionHtml += `
       <div class="assistant-attendance-session">
+
         <div class="assistant-attendance-session-title">
           ${session}차시 <span>${safeTarget}</span>
         </div>
 
         <div class="assistant-attendance-input-row">
+
           <div class="assistant-attendance-input-group">
             <label for="${prefix}_attendance${session}">출석</label>
             <input
               type="number"
-							class="assistant-attendance-number-input"
+              class="assistant-attendance-number-input"
               id="${prefix}_attendance${session}"
               min="0"
               max="12"
@@ -3127,8 +3167,8 @@ function renderAssistantEndReportForm(index, device) {
             <label for="${prefix}_absence${session}">결석</label>
             <input
               type="number"
+              class="assistant-attendance-number-input"
               id="${prefix}_absence${session}"
-							class="assistant-attendance-number-input"
               min="0"
               max="12"
               step="1"
@@ -3141,8 +3181,12 @@ function renderAssistantEndReportForm(index, device) {
 
           <div class="assistant-attendance-input-group">
             <label>총원</label>
-            <div id="${prefix}_total${session}" class="assistant-attendance-total">0명</div>
+            <div
+              id="${prefix}_total${session}"
+              class="assistant-attendance-total"
+            >0명</div>
           </div>
+
         </div>
       </div>
     `;
@@ -3150,27 +3194,40 @@ function renderAssistantEndReportForm(index, device) {
 
 	return `
     <div class="main-teacher-end-report-form assistant-end-report-form">
+
       <div class="main-teacher-end-report-field assistant-attendance-field">
-        <label>출결 현황</label>
+        <label>1. 출결 현황</label>
+
         <div class="assistant-attendance-list">
           ${sessionHtml}
         </div>
-        <div id="${prefix}_attendanceError" class="attendance-error" style="display:none;"></div>
+
+        <div
+          id="${prefix}_attendanceError"
+          class="attendance-error"
+          style="display:none;"
+        ></div>
       </div>
 
       <div class="main-teacher-end-report-field">
-        <label>수업사진</label>
+        <label>2. 수업사진</label>
+
         <div class="file-upload-area">
           <input
-  type="file"
-  id="${prefix}_classPhotos"
-  accept="image/*,.heic,.heif"
-  multiple
-  onchange="previewAssistantClassPhotos('${device}', ${index})"
-/>
-          <div id="${prefix}_classPhotosCount" class="assistant-file-count">
+            type="file"
+            id="${prefix}_classPhotos"
+            accept="image/*,.heic,.heif"
+            multiple
+            onchange="previewAssistantClassPhotos('${device}', ${index})"
+          />
+
+          <div
+            id="${prefix}_classPhotosCount"
+            class="assistant-file-count"
+          >
             ※ 수업사진은 최소 6장 이상 첨부해주세요.
           </div>
+
           <div
             id="${prefix}_classPhotosPreview"
             class="assistant-file-preview"
@@ -3180,7 +3237,8 @@ function renderAssistantEndReportForm(index, device) {
       </div>
 
       <div class="main-teacher-end-report-field">
-        <label for="${prefix}_attendanceBook">출강부</label>
+        <label for="${prefix}_attendanceBook">3. 출강부</label>
+
         <div class="file-upload-area">
           <input
             type="file"
@@ -3188,6 +3246,7 @@ function renderAssistantEndReportForm(index, device) {
             accept="image/*,.heic,.heif,.pdf"
             onchange="handleSinglePhotoSelect('${prefix}_attendanceBookPreview', '${prefix}_attendanceBookPreviewImage', this)"
           />
+
           <div
             id="${prefix}_attendanceBookPreview"
             class="assistant-file-preview start-photo-preview"
@@ -3203,7 +3262,10 @@ function renderAssistantEndReportForm(index, device) {
       </div>
 
       <div class="main-teacher-end-report-field">
-        <label for="${prefix}_consent">사진 및 영상촬영 활용 동의서</label>
+        <label for="${prefix}_consent">
+          4. 사진 및 영상촬영 활용 동의서
+        </label>
+
         <div class="file-upload-area">
           <input
             type="file"
@@ -3211,6 +3273,7 @@ function renderAssistantEndReportForm(index, device) {
             accept="image/*,.heic,.heif,.pdf"
             onchange="handleSinglePhotoSelect('${prefix}_consentPreview', '${prefix}_consentPreviewImage', this)"
           />
+
           <div
             id="${prefix}_consentPreview"
             class="assistant-file-preview start-photo-preview"
@@ -3226,7 +3289,7 @@ function renderAssistantEndReportForm(index, device) {
       </div>
 
       <div class="main-teacher-end-report-field">
-        <label for="${prefix}_otherNote">기타 특이사항</label>
+        <label for="${prefix}_otherNote">5. 기타 특이사항</label>
         <textarea
           id="${prefix}_otherNote"
           rows="3"
@@ -3235,7 +3298,7 @@ function renderAssistantEndReportForm(index, device) {
       </div>
 
       <div class="main-teacher-end-report-field">
-        <label for="${prefix}_reason">미첨부 사유</label>
+        <label for="${prefix}_reason">※ 미첨부 사유</label>
         <textarea
           id="${prefix}_reason"
           rows="3"
@@ -3253,10 +3316,10 @@ function renderAssistantEndReportForm(index, device) {
           종료보고 제출
         </button>
       </div>
+
     </div>
   `;
 }
-
 // ========================================
 // 보조강사 출결 총원 자동 계산
 // ========================================
@@ -3593,41 +3656,33 @@ async function submitAssistantEndReport(index, device) {
 
 			target1:
 				document.getElementById(`${prefix}_target1`)?.value.trim() ||
-				String(schedule.target || "")
-					.split(",")[0]
-					?.trim() ||
+				getEndReportTargetForSession(schedule, 1) ||
 				"",
 
 			attendance1: attendance1,
-
 			absence1: absence1,
-
 			total1: total1,
 
 			target2:
-				document.getElementById(`${prefix}_target2`)?.value.trim() ||
-				String(schedule.target || "")
-					.split(",")[1]
-					?.trim() ||
-				"",
+				sessionCount >= 2
+					? document.getElementById(`${prefix}_target2`)?.value.trim() ||
+						getEndReportTargetForSession(schedule, 2) ||
+						""
+					: "",
 
 			attendance2: sessionCount >= 2 ? attendance2 : "",
-
 			absence2: sessionCount >= 2 ? absence2 : "",
-
 			total2: sessionCount >= 2 ? total2 : "",
 
 			target3:
-				document.getElementById(`${prefix}_target3`)?.value.trim() ||
-				String(schedule.target || "")
-					.split(",")[2]
-					?.trim() ||
-				"",
+				sessionCount >= 3
+					? document.getElementById(`${prefix}_target3`)?.value.trim() ||
+						getEndReportTargetForSession(schedule, 3) ||
+						""
+					: "",
 
 			attendance3: sessionCount >= 3 ? attendance3 : "",
-
 			absence3: sessionCount >= 3 ? absence3 : "",
-
 			total3: sessionCount >= 3 ? total3 : "",
 
 			session2Progress: "",
