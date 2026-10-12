@@ -45,12 +45,25 @@ document.addEventListener("DOMContentLoaded", function () {
   initNewReportBadge();
   initAdminAuth();
 });
+// ==========================================================
+// 운영진 확인번호 사용 여부
+// true  = 확인번호 입력 필요
+// false = 확인번호 입력 없이 대시보드 접속
+// ==========================================================
 
+const ADMIN_AUTH_ENABLED = false;
 // ==========================================================
 // 운영진 인증 초기화
 // ==========================================================
 
 function initAdminAuth() {
+  // 확인번호 인증 비활성화
+  if (!ADMIN_AUTH_ENABLED) {
+    sessionStorage.setItem(ADMIN_AUTH_KEY, "true");
+    showAdminDashboard();
+    return;
+  }
+
   const authenticated = sessionStorage.getItem(ADMIN_AUTH_KEY);
 
   if (authenticated === "true") {
@@ -488,37 +501,32 @@ async function loadAdminData() {
   hideError();
 
   // ========================================================
-  // 캐시가 있으면
-  //
-  // 기존 일정 즉시 표시
-  // 로딩 UI 표시하지 않음
+  // 캐시 확인 후 로딩 표시 여부 결정
   // ========================================================
 
-  if (hasCache) {
+  const hasSchedulesForSelectedDate =
+    Array.isArray(allAdminSchedules) &&
+    allAdminSchedules.some(function (schedule) {
+      return schedule && String(schedule.date || "").trim() === targetDate;
+    });
+
+  if (hasCache && hasSchedulesForSelectedDate) {
     console.log(
-      "[운영진 대시보드] 캐시 즉시 표시 → 최신 데이터 백그라운드 조회",
+      "[운영진 대시보드] 선택 날짜 캐시 있음 → 즉시 표시 후 최신 데이터 조회",
     );
 
     if (emptyMessage) {
       emptyMessage.style.display = "none";
     }
 
-    // 현재 선택 날짜 기준으로
-    // 캐시 일정을 즉시 화면에 표시
     renderFilteredAdminSchedules();
-
-    // 캐시가 있으므로 사용자에게
-    // 별도의 로딩 메시지를 보여주지 않음
     hideLoading();
-  }
-
-  // ========================================================
-  // 캐시가 없으면
-  //
-  // 기존 화면 제거 후 로딩 표시
-  // ========================================================
-  else {
-    console.log("[운영진 대시보드] 캐시 없음 → 로딩 표시");
+  } else {
+    console.log(
+      hasCache
+        ? "[운영진 대시보드] 선택 날짜 일정 없음 → 최신 조회 로딩 표시"
+        : "[운영진 대시보드] 캐시 없음 → 로딩 표시",
+    );
 
     if (emptyMessage) {
       emptyMessage.style.display = "none";
@@ -611,6 +619,8 @@ async function loadAdminData() {
     // ======================================================
     // 최신 데이터 반영
     // ======================================================
+    // 로딩 상태를 먼저 종료
+    adminSchedulesLoading = false;
 
     hideLoading();
 
@@ -630,6 +640,8 @@ async function loadAdminData() {
 
     if (hasCache && Array.isArray(allAdminSchedules)) {
       console.warn("[운영진 대시보드] 최신 조회 실패 → 캐시 화면 유지");
+      // 로딩 상태를 먼저 종료
+      adminSchedulesLoading = false;
 
       hideLoading();
 
@@ -1212,7 +1224,6 @@ function createScheduleCard(schedule) {
   }
 
   const card = document.createElement("div");
-
   card.className = "dispatch-card";
 
   // ========================================================
@@ -1220,11 +1231,9 @@ function createScheduleCard(schedule) {
   // ========================================================
 
   const facilityName = escapeHtml(schedule.facilityName || "-");
-
   const satisfactionBadge = getSatisfactionBadgeHtml(schedule.satisfaction);
 
   const startTime = String(schedule.startTime || schedule.time || "").trim();
-
   const endTime = String(schedule.endTime || "").trim();
 
   let timeText = "-";
@@ -1236,7 +1245,6 @@ function createScheduleCard(schedule) {
   }
 
   const time = escapeHtml(timeText);
-
   const target = escapeHtml(schedule.target || "-");
 
   // ========================================================
@@ -1244,9 +1252,7 @@ function createScheduleCard(schedule) {
   // ========================================================
 
   const mainTeacher = getInstructorName(schedule.mainTeacher);
-
   const assistantTeacher = getInstructorName(schedule.assistantTeacher);
-
   const assistantIsOperations = schedule.assistantIsOperations === true;
 
   // ========================================================
@@ -1254,9 +1260,7 @@ function createScheduleCard(schedule) {
   // ========================================================
 
   const mainComplete = schedule.mainEndReport === true;
-
   const assistantStartComplete = schedule.assistantStartReport === true;
-
   const assistantEndComplete = schedule.assistantEndReport === true;
 
   // ========================================================
@@ -1350,20 +1354,14 @@ function createScheduleCard(schedule) {
         ${time}
       </span>
 
-      <span class="info-divider">
-        |
-      </span>
+      <span class="info-divider">|</span>
 
-      <span>
-        ${target}
-      </span>
+      <span>${target}</span>
     </div>
 
     <div class="teacher-list">
 
-      <!-- ==================================================
-           주강사
-           ================================================== -->
+      <!-- 주강사 -->
 
       <div class="teacher-block">
 
@@ -1378,6 +1376,8 @@ function createScheduleCard(schedule) {
           </div>
 
           <div class="report-status-wrap">
+
+            <!-- 종료보고 상태 + 제출시간 -->
 
             <div class="report-item">
 
@@ -1397,9 +1397,19 @@ function createScheduleCard(schedule) {
                   : ""
               }
 
-              ${mainAttendanceHtml}
-
             </div>
+
+            <!-- 출석 인원: 종료보고 아래 별도 줄 -->
+
+            ${
+              mainAttendanceHtml
+                ? `
+                  <div class="attendance-row">
+                    ${mainAttendanceHtml}
+                  </div>
+                `
+                : ""
+            }
 
           </div>
 
@@ -1407,10 +1417,7 @@ function createScheduleCard(schedule) {
 
       </div>
 
-
-      <!-- ==================================================
-           보조강사
-           ================================================== -->
+      <!-- 보조강사 -->
 
       <div class="teacher-block">
 
@@ -1428,9 +1435,7 @@ function createScheduleCard(schedule) {
 
           <div class="assistant-status">
 
-            <!-- ----------------------------------------------
-                 시작보고
-                 ---------------------------------------------- -->
+            <!-- 시작보고 상태 + 제출시간 -->
 
             <div class="assistant-report-item">
 
@@ -1452,10 +1457,7 @@ function createScheduleCard(schedule) {
 
             </div>
 
-
-            <!-- ----------------------------------------------
-                 종료보고
-                 ---------------------------------------------- -->
+            <!-- 종료보고 상태 + 제출시간 -->
 
             <div class="assistant-report-item">
 
@@ -1475,9 +1477,19 @@ function createScheduleCard(schedule) {
                   : ""
               }
 
-              ${assistantAttendanceHtml}
-
             </div>
+
+            <!-- 출석 인원: 종료보고 아래 별도 줄 -->
+
+            ${
+              assistantAttendanceHtml
+                ? `
+                  <div class="attendance-row">
+                    ${assistantAttendanceHtml}
+                  </div>
+                `
+                : ""
+            }
 
           </div>
 
@@ -1490,7 +1502,6 @@ function createScheduleCard(schedule) {
 
   return card;
 }
-
 // ==========================================================
 // 보고 지연 여부
 //

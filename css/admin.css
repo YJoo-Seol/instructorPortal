@@ -1202,3 +1202,39 @@
     font-size: 10px;
   }
 }
+
+/* ============================================================
+   운영진 대시보드
+   종료보고와 출석 인원 분리
+   ============================================================ */
+
+/* 주강사 종료보고와 출석 인원을 세로로 배치 */
+.report-status-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 출석 인원 전용 줄 */
+.attendance-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* 출석 인원 줄은 종료보고 시간과 간격 없이 정렬 */
+.attendance-row .attendance-wrap {
+  margin-left: 0;
+}
+
+/* 출석 인원 줄 안의 항목 간격 */
+.attendance-row .attendance-wrap {
+  gap: 4px;
+}
