@@ -2926,6 +2926,60 @@ async function compressImageFile(file) {
     );
   }
 
+  // GIF는 기존처럼 JPEG로 변환해 저장 형식 호환성을 유지
+  // JPG / PNG / WebP는 크기 조정이나 재압축 없이 원본 바이트를 전송
+  if (String(preparedFile.type || "").toLowerCase() !== "image/gif") {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+
+      reader.onload = function () {
+        const result = String(reader.result || "");
+        const commaIndex = result.indexOf(",");
+
+        if (commaIndex === -1) {
+          reject(
+            new Error(
+              `"${preparedFile.name || "사진"}" 이미지 데이터를 읽지 못했습니다.`,
+            ),
+          );
+          return;
+        }
+
+        const base64 = result.substring(commaIndex + 1);
+
+        if (!base64) {
+          reject(new Error("이미지 데이터가 비어 있습니다."));
+          return;
+        }
+
+        resolve({
+          base64: base64,
+          fileName: preparedFile.name || "image.jpg",
+          fileType: preparedFile.type || "image/jpeg",
+        });
+      };
+
+      reader.onerror = function () {
+        reject(
+          new Error(
+            `"${preparedFile.name || "사진"}" 이미지 파일을 읽지 못했습니다.`,
+          ),
+        );
+      };
+
+      reader.onabort = function () {
+        reject(
+          new Error(
+            `"${preparedFile.name || "사진"}" 이미지 읽기가 중단되었습니다.`,
+          ),
+        );
+      };
+
+      reader.readAsDataURL(preparedFile);
+    });
+  }
+
+  // GIF는 기존 압축 로직을 사용해 Apps Script 저장 형식과 호환되도록 함
   return new Promise(function (resolve, reject) {
     const reader = new FileReader();
 
@@ -2951,13 +3005,11 @@ async function compressImageFile(file) {
 
           if (width > maxWidth || height > maxHeight) {
             const ratio = Math.min(maxWidth / width, maxHeight / height);
-
             width = Math.round(width * ratio);
             height = Math.round(height * ratio);
           }
 
           const canvas = document.createElement("canvas");
-
           canvas.width = width;
           canvas.height = height;
 
@@ -2989,7 +3041,6 @@ async function compressImageFile(file) {
           }
 
           const base64 = dataUrl.substring(commaIndex + 1);
-
           const baseName = String(preparedFile.name || "image").replace(
             /\.[^/.]+$/,
             "",
@@ -3002,7 +3053,6 @@ async function compressImageFile(file) {
           });
         } catch (error) {
           console.error("이미지 압축 처리 오류:", error);
-
           reject(
             new Error(
               `"${preparedFile.name || "사진"}" 이미지를 처리하지 못했습니다.`,
@@ -3041,7 +3091,6 @@ async function compressImageFile(file) {
     reader.readAsDataURL(preparedFile);
   });
 }
-
 // ========================================
 // 보조강사 종료보고 열기 / 닫기
 // ========================================
