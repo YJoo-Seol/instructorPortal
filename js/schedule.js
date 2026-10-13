@@ -2161,7 +2161,7 @@ async function submitMainTeacherEndReport(index, device) {
 
     schedule.myReport.end = true;
 
-    hideReportSubmitLoading();
+    await completeReportSubmitLoading("주강사 종료보고 제출이 완료되었습니다.");
 
     alert(result.message || "주강사 종료보고가 제출되었습니다.");
 
@@ -2534,7 +2534,9 @@ async function submitAssistantStartReport(index, device) {
     // 7. 제출 성공 → 로딩 종료
     // ==========================================================
 
-    hideReportSubmitLoading();
+    await completeReportSubmitLoading(
+      "보조강사 시작보고 제출이 완료되었습니다.",
+    );
 
     // ==========================================================
     // 8. 화면 상태 업데이트
@@ -2926,130 +2928,113 @@ async function compressImageFile(file) {
     );
   }
 
-  // GIF는 기존처럼 JPEG로 변환해 저장 형식 호환성을 유지
-  // JPG / PNG / WebP는 크기 조정이나 재압축 없이 원본 바이트를 전송
-  if (String(preparedFile.type || "").toLowerCase() !== "image/gif") {
-    return new Promise(function (resolve, reject) {
-      const reader = new FileReader();
+  const fileName = preparedFile.name || "image.jpg";
+  const baseName = fileName.replace(/\.[^/.]+$/, "");
 
-      reader.onload = function () {
-        const result = String(reader.result || "");
-        const commaIndex = result.indexOf(",");
+  // ========================================
+  // 이미지 압축 설정
+  // ========================================
 
-        if (commaIndex === -1) {
-          reject(
-            new Error(
-              `"${preparedFile.name || "사진"}" 이미지 데이터를 읽지 못했습니다.`,
-            ),
-          );
-          return;
-        }
+  const maxWidth = 2560;
+  const maxHeight = 2560;
+  const jpegQuality = 0.92;
 
-        const base64 = result.substring(commaIndex + 1);
-
-        if (!base64) {
-          reject(new Error("이미지 데이터가 비어 있습니다."));
-          return;
-        }
-
-        resolve({
-          base64: base64,
-          fileName: preparedFile.name || "image.jpg",
-          fileType: preparedFile.type || "image/jpeg",
-        });
-      };
-
-      reader.onerror = function () {
-        reject(
-          new Error(
-            `"${preparedFile.name || "사진"}" 이미지 파일을 읽지 못했습니다.`,
-          ),
-        );
-      };
-
-      reader.onabort = function () {
-        reject(
-          new Error(
-            `"${preparedFile.name || "사진"}" 이미지 읽기가 중단되었습니다.`,
-          ),
-        );
-      };
-
-      reader.readAsDataURL(preparedFile);
-    });
-  }
-
-  // GIF는 기존 압축 로직을 사용해 Apps Script 저장 형식과 호환되도록 함
   return new Promise(function (resolve, reject) {
     const reader = new FileReader();
 
     reader.onload = function () {
+      const imageData = String(reader.result || "");
+
+      if (!imageData.startsWith("data:image/")) {
+        reject(new Error(`"${fileName}" 이미지 데이터를 읽지 못했습니다.`));
+        return;
+      }
+
       const img = new Image();
 
       img.onload = function () {
-        try {
-          // 성과자료집 제작을 고려한 고화질 설정
-          const maxWidth = 2560;
-          const maxHeight = 2560;
-          const jpegQuality = 0.92;
+        let canvas = null;
 
-          let width = img.width;
-          let height = img.height;
+        try {
+          let width = img.naturalWidth;
+          let height = img.naturalHeight;
 
           if (!width || !height) {
-            reject(
-              new Error(
-                `"${preparedFile.name || "사진"}" 이미지 크기를 확인할 수 없습니다.`,
-              ),
-            );
-            return;
+            throw new Error("이미지 크기를 확인할 수 없습니다.");
           }
 
-          // 원본 비율을 유지하면서 최대 해상도 제한
-          // 원본이 설정값보다 작으면 확대하지 않음
+          const originalWidth = width;
+          const originalHeight = height;
+
+          // ========================================
+          // 원본 비율 유지 + 최대 해상도 제한
+          // ========================================
+
           if (width > maxWidth || height > maxHeight) {
             const ratio = Math.min(maxWidth / width, maxHeight / height);
-            width = Math.round(width * ratio);
-            height = Math.round(height * ratio);
+
+            width = Math.max(1, Math.round(width * ratio));
+            height = Math.max(1, Math.round(height * ratio));
           }
 
-          const canvas = document.createElement("canvas");
+          canvas = document.createElement("canvas");
           canvas.width = width;
           canvas.height = height;
 
           const ctx = canvas.getContext("2d");
 
           if (!ctx) {
-            reject(new Error("이미지 처리 공간을 만들 수 없습니다."));
-            return;
+            throw new Error("이미지 처리 공간을 만들 수 없습니다.");
           }
+
+          // 투명 영역이 JPEG 변환 시 검게 변하지 않도록
+          // 흰색 배경을 먼저 적용
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, width, height);
 
           ctx.drawImage(img, 0, 0, width, height);
 
-          // 기존 0.8에서 0.92로 화질 향상
+          // ========================================
+          // JPG / PNG / WebP / GIF 모두 JPEG로 변환
+          // ========================================
+
           const dataUrl = canvas.toDataURL("image/jpeg", jpegQuality);
 
           if (!dataUrl || dataUrl === "data:,") {
-            reject(
-              new Error(
-                `"${preparedFile.name || "사진"}" 이미지를 JPEG로 변환하지 못했습니다.`,
-              ),
-            );
-            return;
+            throw new Error("JPEG 이미지 변환에 실패했습니다.");
           }
 
           const commaIndex = dataUrl.indexOf(",");
 
           if (commaIndex === -1) {
-            reject(new Error("JPEG 이미지 데이터를 읽지 못했습니다."));
-            return;
+            throw new Error("변환된 이미지 데이터를 읽지 못했습니다.");
           }
 
           const base64 = dataUrl.substring(commaIndex + 1);
-          const baseName = String(preparedFile.name || "image").replace(
-            /\.[^/.]+$/,
-            "",
-          );
+
+          if (!base64) {
+            throw new Error("압축된 이미지 데이터가 비어 있습니다.");
+          }
+
+          // ========================================
+          // 압축 결과 확인
+          // ========================================
+
+          const originalBase64Length = imageData.substring(
+            imageData.indexOf(",") + 1,
+          ).length;
+
+          console.log("[이미지 압축 완료]", {
+            fileName: fileName,
+            originalWidth: originalWidth,
+            originalHeight: originalHeight,
+            compressedWidth: width,
+            compressedHeight: height,
+            originalApproxBytes: Math.round((originalBase64Length * 3) / 4),
+            compressedApproxBytes: Math.round((base64.length * 3) / 4),
+            quality: jpegQuality,
+            resized: originalWidth !== width || originalHeight !== height,
+          });
 
           resolve({
             base64: base64,
@@ -3057,40 +3042,40 @@ async function compressImageFile(file) {
             fileType: "image/jpeg",
           });
         } catch (error) {
-          console.error("이미지 압축 처리 오류:", error);
+          console.error("[이미지 압축 오류]", error);
+
           reject(
             new Error(
-              `"${preparedFile.name || "사진"}" 이미지를 처리하지 못했습니다.`,
+              `"${fileName}" 이미지 처리 실패: ${
+                error.message || "알 수 없는 오류"
+              }`,
             ),
           );
+        } finally {
+          // 이미지 처리 후 메모리 정리
+          if (canvas) {
+            canvas.width = 0;
+            canvas.height = 0;
+          }
+
+          img.onload = null;
+          img.onerror = null;
         }
       };
 
       img.onerror = function () {
-        reject(
-          new Error(
-            `"${preparedFile.name || "사진"}" 이미지를 불러오지 못했습니다.`,
-          ),
-        );
+        reject(new Error(`"${fileName}" 이미지를 불러오지 못했습니다.`));
       };
 
-      img.src = reader.result;
+      img.src = imageData;
     };
 
     reader.onerror = function () {
-      reject(
-        new Error(
-          `"${preparedFile.name || "사진"}" 이미지 파일을 읽지 못했습니다.`,
-        ),
-      );
+      reject(new Error(`"${fileName}" 파일을 읽지 못했습니다.`));
     };
 
     reader.onabort = function () {
-      reject(
-        new Error(
-          `"${preparedFile.name || "사진"}" 이미지 읽기가 중단되었습니다.`,
-        ),
-      );
+      reject(new Error(`"${fileName}" 이미지 읽기가 중단되었습니다.`));
     };
 
     reader.readAsDataURL(preparedFile);
@@ -3883,7 +3868,9 @@ async function submitAssistantEndReport(index, device) {
     // 제출 성공
     // ============================================================
 
-    hideReportSubmitLoading();
+    await completeReportSubmitLoading(
+      "보조강사 종료보고 제출이 완료되었습니다.",
+    );
 
     const submittedPageId = String(schedule.pageId || "").trim();
 
@@ -4764,63 +4751,272 @@ function getSessionCount(schedule) {
 }
 let reportSubmitLoading = false;
 
+let reportSubmitProgressTimer = null;
+let reportSubmitStartedAt = 0;
+
+// 예상 진행 시간: 90초
+const REPORT_SUBMIT_ESTIMATED_MS = 90000;
+
 // ============================================================
-// 보고서 제출 공통 전체 화면 로딩
+// 보고서 제출 로딩 화면 표시 + 진행률 시작
 // ============================================================
 
 function showReportSubmitLoading(message) {
-  // 이미 표시 중이면 중복 실행하지 않음
   if (reportSubmitLoading) {
     return;
   }
 
   reportSubmitLoading = true;
-
-  // 브라우저 이탈 경고 활성화
   window.__reportSubmitInProgress = true;
 
-  // 기존 로딩 화면 제거
+  if (reportSubmitProgressTimer) {
+    clearInterval(reportSubmitProgressTimer);
+    reportSubmitProgressTimer = null;
+  }
+
   const existing = document.getElementById("reportSubmitLoadingOverlay");
 
   if (existing) {
     existing.remove();
   }
 
-  const overlay = document.createElement("div");
+  reportSubmitStartedAt = Date.now();
 
+  const overlay = document.createElement("div");
   overlay.id = "reportSubmitLoadingOverlay";
 
   overlay.innerHTML = `
     <div class="report-submit-loading-box">
-
-      <div class="report-submit-loading-spinner"></div>
-
       <div class="report-submit-loading-title">
         ${message || "보고서를 제출하고 있습니다."}
       </div>
 
-      <div class="report-submit-loading-warning">
-        제출이 완료될 때까지<br>
-        페이지를 새로고침하거나 이동하지 마세요.
+      <div class="report-submit-loading-description">
+        사진 저장 및 제출 내용을 처리하고 있습니다.
       </div>
 
+      <div
+        id="reportSubmitProgressPercent"
+        class="report-submit-progress-percent"
+      >3%</div>
+
+      <div
+        class="report-submit-progress-track"
+        role="progressbar"
+        aria-label="보고서 제출 진행률"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="3"
+      >
+        <div
+          id="reportSubmitProgressBar"
+          class="report-submit-progress-bar"
+          style="width: 3%;"
+        ></div>
+      </div>
+
+      <div
+        id="reportSubmitProgressStatus"
+        class="report-submit-progress-status"
+      >사진을 준비하고 있습니다.</div>
+
+      <div class="report-submit-loading-warning">
+        제출이 완료될 때까지<br>
+        페이지를 닫거나 새로고침하지 마세요.
+      </div>
     </div>
   `;
 
   document.body.appendChild(overlay);
-
-  // 화면 스크롤 방지
   document.body.style.overflow = "hidden";
+
+  // 기존 스타일을 활용하면서 진행률 표시 영역을 구성
+  const box = overlay.querySelector(".report-submit-loading-box");
+
+  if (box) {
+    Object.assign(box.style, {
+      width: "min(90%, 420px)",
+      boxSizing: "border-box",
+      padding: "32px 24px",
+      textAlign: "center",
+    });
+  }
+
+  const description = overlay.querySelector(
+    ".report-submit-loading-description",
+  );
+
+  if (description) {
+    Object.assign(description.style, {
+      marginTop: "14px",
+      color: "#666B73",
+      lineHeight: "1.6",
+    });
+  }
+
+  const percent = overlay.querySelector("#reportSubmitProgressPercent");
+
+  if (percent) {
+    Object.assign(percent.style, {
+      marginTop: "28px",
+      fontSize: "36px",
+      fontWeight: "700",
+      color: "#406093",
+      fontVariantNumeric: "tabular-nums",
+    });
+  }
+
+  const track = overlay.querySelector(".report-submit-progress-track");
+
+  if (track) {
+    Object.assign(track.style, {
+      width: "100%",
+      height: "10px",
+      marginTop: "16px",
+      overflow: "hidden",
+      borderRadius: "999px",
+      background: "#D9DDE5",
+    });
+  }
+
+  const bar = overlay.querySelector("#reportSubmitProgressBar");
+
+  if (bar) {
+    Object.assign(bar.style, {
+      height: "100%",
+      borderRadius: "999px",
+      background: "#406093",
+      transition: "width 0.25s ease",
+    });
+  }
+
+  const status = overlay.querySelector("#reportSubmitProgressStatus");
+
+  if (status) {
+    Object.assign(status.style, {
+      marginTop: "16px",
+      fontWeight: "600",
+      color: "#406093",
+    });
+  }
+
+  const warning = overlay.querySelector(".report-submit-loading-warning");
+
+  if (warning) {
+    Object.assign(warning.style, {
+      marginTop: "24px",
+      fontSize: "13px",
+      lineHeight: "1.7",
+      color: "#666B73",
+    });
+  }
+
+  // 경과 시간에 따라 진행률 갱신
+  reportSubmitProgressTimer = setInterval(() => {
+    const elapsed = Date.now() - reportSubmitStartedAt;
+
+    // 90초가 지나도 95%를 초과하지 않음
+    const progress = Math.min(
+      95,
+      Math.floor(3 + (elapsed / REPORT_SUBMIT_ESTIMATED_MS) * 92),
+    );
+
+    const percentElement = document.getElementById(
+      "reportSubmitProgressPercent",
+    );
+
+    const barElement = document.getElementById("reportSubmitProgressBar");
+
+    const statusElement = document.getElementById("reportSubmitProgressStatus");
+
+    const trackElement = overlay.querySelector(".report-submit-progress-track");
+
+    if (percentElement) {
+      percentElement.textContent = `${progress}%`;
+    }
+
+    if (barElement) {
+      barElement.style.width = `${progress}%`;
+    }
+
+    if (trackElement) {
+      trackElement.setAttribute("aria-valuenow", String(progress));
+    }
+
+    if (statusElement) {
+      if (progress < 25) {
+        statusElement.textContent = "사진을 준비하고 있습니다.";
+      } else if (progress < 70) {
+        statusElement.textContent =
+          "사진 저장 및 제출 내용을 처리하고 있습니다.";
+      } else {
+        statusElement.textContent = "서버 응답을 기다리고 있습니다.";
+      }
+    }
+  }, 250);
 }
 
-// ------------------------------------------------------------
+// ============================================================
+// 서버 성공 응답 후 완료 표시
+// ============================================================
+
+function completeReportSubmitLoading(message = "제출이 완료되었습니다.") {
+  if (reportSubmitProgressTimer) {
+    clearInterval(reportSubmitProgressTimer);
+    reportSubmitProgressTimer = null;
+  }
+
+  const overlay = document.getElementById("reportSubmitLoadingOverlay");
+
+  if (!overlay) {
+    hideReportSubmitLoading();
+    return Promise.resolve();
+  }
+
+  const percent = overlay.querySelector("#reportSubmitProgressPercent");
+
+  const bar = overlay.querySelector("#reportSubmitProgressBar");
+
+  const status = overlay.querySelector("#reportSubmitProgressStatus");
+
+  const track = overlay.querySelector(".report-submit-progress-track");
+
+  if (percent) {
+    percent.textContent = "100%";
+  }
+
+  if (bar) {
+    bar.style.width = "100%";
+  }
+
+  if (track) {
+    track.setAttribute("aria-valuenow", "100");
+  }
+
+  if (status) {
+    status.textContent = message;
+  }
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      hideReportSubmitLoading();
+      resolve();
+    }, 700);
+  });
+}
+
+// ============================================================
 // 제출 로딩 화면 제거
-// ------------------------------------------------------------
+// 오류 발생 시 기존처럼 즉시 종료
+// ============================================================
 
 function hideReportSubmitLoading() {
-  reportSubmitLoading = false;
+  if (reportSubmitProgressTimer) {
+    clearInterval(reportSubmitProgressTimer);
+    reportSubmitProgressTimer = null;
+  }
 
-  // 브라우저 이탈 경고 해제
+  reportSubmitLoading = false;
   window.__reportSubmitInProgress = false;
 
   const overlay = document.getElementById("reportSubmitLoadingOverlay");
