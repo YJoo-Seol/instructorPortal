@@ -1747,6 +1747,15 @@ function renderMainTeacherEndReportForm(index, device) {
         ></textarea>
       </div>
 
+      <div class="main-teacher-end-report-field">
+        <label for="${prefix}_teacherReview">5. 강사 후기</label>
+        <textarea
+          id="${prefix}_teacherReview"
+          rows="4"
+          placeholder="수업 진행 소감이나 참여자 반응, 프로그램에 대한 의견을 자유롭게 작성해주세요. (선택)"
+        ></textarea>
+      </div>
+
       <div class="main-teacher-end-report-actions">
         <button
           type="button"
@@ -1964,6 +1973,9 @@ async function submitMainTeacherEndReport(index, device) {
 		const otherNote =
 			document.getElementById(`${prefix}_otherNote`)?.value.trim() || "";
 
+		const teacherReview =
+			document.getElementById(`${prefix}_teacherReview`)?.value.trim() || "";
+
 		const photoInput = document.getElementById(`${prefix}_photo`);
 
 		if (!attendance1) {
@@ -2042,6 +2054,8 @@ async function submitMainTeacherEndReport(index, device) {
 			storage: storage,
 
 			otherNote: otherNote,
+
+			teacherReview: teacherReview,
 
 			photoData: base64,
 
@@ -3298,6 +3312,15 @@ function renderAssistantEndReportForm(index, device) {
       </div>
 
       <div class="main-teacher-end-report-field">
+        <label for="${prefix}_teacherReview">6. 강사 후기</label>
+        <textarea
+          id="${prefix}_teacherReview"
+          rows="4"
+          placeholder="수업 진행 소감이나 참여자 반응, 프로그램에 대한 의견을 자유롭게 작성해주세요. (선택)"
+        ></textarea>
+      </div>
+
+      <div class="main-teacher-end-report-field">
         <label for="${prefix}_reason">※ 미첨부 사유</label>
         <textarea
           id="${prefix}_reason"
@@ -3505,6 +3528,9 @@ async function submitAssistantEndReport(index, device) {
 		const otherNote =
 			document.getElementById(`${prefix}_otherNote`)?.value.trim() || "";
 
+		const teacherReview =
+			document.getElementById(`${prefix}_teacherReview`)?.value.trim() || "";
+
 		const reason =
 			document.getElementById(`${prefix}_reason`)?.value.trim() || "";
 
@@ -3702,6 +3728,8 @@ async function submitAssistantEndReport(index, device) {
 			consentType: consentType,
 
 			otherNote: otherNote,
+
+			teacherReview: teacherReview,
 
 			reason: reason,
 
