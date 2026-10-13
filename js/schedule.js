@@ -2801,7 +2801,7 @@ async function convertHeicToJpeg(file) {
     let jpegBlob = await window.HeicTo({
       blob: file,
       type: "image/jpeg",
-      quality: 0.88,
+      quality: 0.92,
     });
 
     // 라이브러리 버전에 따라 배열로 반환될 가능성 대응
@@ -2988,8 +2988,10 @@ async function compressImageFile(file) {
 
       img.onload = function () {
         try {
-          const maxWidth = 1600;
-          const maxHeight = 1600;
+          // 성과자료집 제작을 고려한 고화질 설정
+          const maxWidth = 2560;
+          const maxHeight = 2560;
+          const jpegQuality = 0.92;
 
           let width = img.width;
           let height = img.height;
@@ -3003,6 +3005,8 @@ async function compressImageFile(file) {
             return;
           }
 
+          // 원본 비율을 유지하면서 최대 해상도 제한
+          // 원본이 설정값보다 작으면 확대하지 않음
           if (width > maxWidth || height > maxHeight) {
             const ratio = Math.min(maxWidth / width, maxHeight / height);
             width = Math.round(width * ratio);
@@ -3022,7 +3026,8 @@ async function compressImageFile(file) {
 
           ctx.drawImage(img, 0, 0, width, height);
 
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+          // 기존 0.8에서 0.92로 화질 향상
+          const dataUrl = canvas.toDataURL("image/jpeg", jpegQuality);
 
           if (!dataUrl || dataUrl === "data:,") {
             reject(
