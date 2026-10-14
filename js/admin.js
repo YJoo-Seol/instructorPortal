@@ -86,8 +86,26 @@ function initAdminAuth() {
 // ==========================================================
 
 function showAdminLogin() {
-  const loginScreen = document.getElementById("adminVerificationArea");
+  // 확인번호 기능이 비활성화되어 있으면 로그인 화면을 표시하지 않음
+  if (!ADMIN_AUTH_ENABLED) {
+    sessionStorage.setItem(ADMIN_AUTH_KEY, "true");
 
+    const loginScreen = document.getElementById("adminVerificationArea");
+
+    if (loginScreen) {
+      loginScreen.style.display = "none";
+    }
+
+    const dashboard = document.getElementById("adminDashboardArea");
+
+    if (dashboard) {
+      dashboard.style.display = "block";
+    }
+
+    return;
+  }
+
+  const loginScreen = document.getElementById("adminVerificationArea");
   const dashboard = document.getElementById("adminDashboardArea");
 
   if (loginScreen) {
@@ -98,6 +116,7 @@ function showAdminLogin() {
     dashboard.style.display = "none";
   }
 }
+
 // ==========================================================
 // 운영진 대시보드 표시
 // ==========================================================
@@ -574,8 +593,14 @@ function loadAdminDashboardCache(weekKeyOverride) {
 // 6. 최신 조회 실패 시 캐시 화면 유지
 // ==========================================================
 
-async function loadAdminData() {
-  if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "true") {
+async function loadAdminData(forceFresh = false) {
+  // 확인번호 기능이 꺼져 있으면 인증 상태를 항상 유지
+  if (!ADMIN_AUTH_ENABLED) {
+    sessionStorage.setItem(ADMIN_AUTH_KEY, "true");
+  }
+
+  // 확인번호 기능이 활성화된 경우에만 인증 검사
+  if (ADMIN_AUTH_ENABLED && sessionStorage.getItem(ADMIN_AUTH_KEY) !== "true") {
     showAdminLogin();
     return;
   }
@@ -612,17 +637,17 @@ async function loadAdminData() {
 
   // --------------------------------------------------------
   // 주간 캐시 확인
+  // forceFresh가 true이면 기존 캐시를 화면에 표시하지 않음
   // --------------------------------------------------------
 
-  const hasCache = loadAdminDashboardCache(requestWeekKey);
+  const hasCache = !forceFresh && loadAdminDashboardCache(requestWeekKey);
 
   const emptyMessage = document.getElementById("emptyMessage");
 
   hideError();
 
   if (hasCache) {
-    // 캐시가 있으면 일정 유무와 관계없이 바로 렌더링
-    // 해당 날짜 일정이 없으면 빈 일정 안내를 표시
+    // 일반 조회는 기존 캐시를 즉시 표시
     adminSchedulesLoading = false;
 
     hideLoading();
@@ -635,17 +660,33 @@ async function loadAdminData() {
       schedules: allAdminSchedules.length,
     });
   } else {
-    // 캐시가 없는 주만 로딩 화면 표시
+    // ------------------------------------------------------
+    // 캐시가 없거나 날짜 변경으로 강제 새로고침하는 경우
+    // 이전 현황을 즉시 제거하고 숫자를 0으로 초기화
+    // ------------------------------------------------------
+
     adminSchedulesLoading = true;
 
-    // 이전 주 데이터가 새 주 화면에 표시되지 않도록 초기화
     allAdminSchedules = [];
+
+    updateSummary(0, 0, 0);
+
+    const list = document.getElementById("adminList");
+
+    if (list) {
+      list.innerHTML = "";
+    }
 
     if (emptyMessage) {
       emptyMessage.style.display = "none";
     }
 
     showLoading();
+
+    console.log("[운영진 대시보드] 현황 초기화 후 서버 조회:", {
+      date: targetDate,
+      forceFresh: forceFresh,
+    });
   }
 
   try {
@@ -681,6 +722,52 @@ async function loadAdminData() {
     const result = await response.json();
 
     console.log("[운영진 API 전체 응답]", result);
+    if (result && result.timing) {
+      console.table([
+        {
+          구간: "Notion DB 조회",
+          시간: result.timing.notionDatabaseMs,
+        },
+        {
+          구간: "프로그램 필터링",
+          시간: result.timing.programFilterMs,
+        },
+        {
+          구간: "관계 데이터 사전 조회",
+          시간: result.timing.relationPreloadMs,
+        },
+        {
+          구간: "일정 변환",
+          시간: result.timing.convertScheduleMs,
+        },
+        {
+          구간: "주강사 보고 상태",
+          시간: result.timing.mainReportStatusMs,
+        },
+        {
+          구간: "주강사 제출 시간",
+          시간: result.timing.mainReportTimeMs,
+        },
+        {
+          구간: "보조강사 시작보고 시간",
+          시간: result.timing.assistantStartReportTimeMs,
+        },
+        {
+          구간: "보조강사 종료보고 시간",
+          시간: result.timing.assistantEndReportTimeMs,
+        },
+        {
+          구간: "그룹화 나머지 작업",
+          시간: result.timing.groupingOtherMs,
+        },
+      ]);
+    }
+    if (result && result.success === false) {
+      console.error("[운영진 서버 오류 상세]", {
+        실패구간: result.debugStep,
+        오류스택: result.debugStack,
+      });
+    }
 
     if (
       !result ||
@@ -722,11 +809,10 @@ async function loadAdminData() {
       return;
     }
 
-    // --------------------------------------------------------
-    // 현재 화면에 해당하는 최신 응답만 반영
-    // --------------------------------------------------------
-
-    detectNewAdminReports(latestSchedules, false);
+    // ==========================================================
+    // 최신 일정 우선 화면 반영
+    // 보고 감지 작업보다 화면 렌더링을 먼저 수행
+    // ==========================================================
 
     allAdminSchedules = latestSchedules;
 
@@ -736,7 +822,24 @@ async function loadAdminData() {
 
     hideError();
 
+    var renderStartTime = performance.now();
+
     renderFilteredAdminSchedules();
+
+    var renderElapsedMs = Math.round(performance.now() - renderStartTime);
+
+    console.log(
+      "[운영진 대시보드] 일정 화면 렌더링 완료:",
+      renderElapsedMs + "ms",
+    );
+
+    // 화면 갱신 이후 보고 상태 비교
+    // 기존 보고 감지 및 읽지 않은 보고 배지 처리는 유지
+    setTimeout(function () {
+      if (isCurrentRequest()) {
+        detectNewAdminReports(latestSchedules, false);
+      }
+    }, 0);
 
     console.log("[운영진 대시보드] 최신 데이터 갱신 완료:", {
       date: targetDate,
@@ -1896,13 +1999,20 @@ function getAdminWeekKey(date) {
 
 // ==========================================================
 // 운영진 대시보드 자동 갱신
-// 1분마다 최신 일정 조회
+// 3분마다 최신 일정 조회
+// 실제 날짜가 변경되면 현황 초기화 후 오늘 일정 조회
 // ==========================================================
 
 let adminAutoRefreshTimer = null;
+let adminLastObservedTodayKey = "";
 
 function startAdminAutoRefresh() {
   stopAdminAutoRefresh();
+
+  const initialToday = new Date();
+  initialToday.setHours(0, 0, 0, 0);
+
+  adminLastObservedTodayKey = formatAdminDateKey(initialToday);
 
   adminAutoRefreshTimer = setInterval(
     function () {
@@ -1911,6 +2021,34 @@ function startAdminAutoRefresh() {
         return;
       }
 
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const todayKey = formatAdminDateKey(today);
+
+      // 실제 날짜가 변경됐는지 확인
+      if (todayKey !== adminLastObservedTodayKey) {
+        const previousTodayKey = adminLastObservedTodayKey;
+
+        adminLastObservedTodayKey = todayKey;
+
+        console.log("[운영진 자동 갱신] 날짜 변경 감지:", {
+          이전오늘: previousTodayKey,
+          새오늘: todayKey,
+        });
+
+        // 선택 날짜를 오늘로 변경
+        selectedAdminDate = today;
+
+        updateAdminDateDisplay();
+
+        // 캐시를 표시하지 않고 현황 0부터 시작
+        loadAdminData(true);
+
+        return;
+      }
+
+      // 날짜가 바뀌지 않았다면 기존 선택 날짜 기준으로 갱신
       console.log("[운영진 자동 갱신] 최신 일정 조회");
 
       loadAdminData();
