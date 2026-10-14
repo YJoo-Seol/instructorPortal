@@ -469,8 +469,6 @@ async function loadReportSchedules(data) {
     if (hasCache && isCurrentViewRequest()) {
       allReportSchedules = cachedSchedules.schedules;
 
-      hasDisplayedCache = true;
-
       currentScheduleRole =
         normalizeRole(cachedSchedules.role) ||
         currentScheduleRole ||
@@ -485,6 +483,8 @@ async function loadReportSchedules(data) {
 
       // 캐시 일정 즉시 표시
       renderFilteredSchedules();
+
+      hasDisplayedCache = true;
 
       console.log("[강사 일정] 캐시 일정 즉시 표시:", {
         주차: targetWeekKey,
@@ -605,15 +605,16 @@ async function loadReportSchedules(data) {
       return;
     }
 
-    // ------------------------------------------------------
+    // 최신 서버 결과 렌더링에 실패하면
+    // 캐시 화면이 정상 표시된 것으로 오인하지 않도록 초기화
+    hasDisplayedCache = false;
+
     // 최신 요청 결과만 화면 데이터에 반영
-    // ------------------------------------------------------
     allReportSchedules = latestSchedules;
 
     currentScheduleRole = role;
 
     reportScheduleLoading = false;
-
     // ------------------------------------------------------
     // 강사번호
     // ------------------------------------------------------
@@ -651,6 +652,9 @@ async function loadReportSchedules(data) {
     updateDateDisplay();
 
     renderFilteredSchedules();
+
+    // 최신 서버 결과까지 정상적으로 렌더링된 경우에만 표시 완료 처리
+    hasDisplayedCache = true;
 
     console.log("========== 최신 일정/보고 현황 화면 갱신 완료 ==========", {
       현재선택날짜: formatScheduleDateKey(selectedScheduleDate),
@@ -834,7 +838,8 @@ function getSatisfactionBadgeHtml(satisfaction) {
   if (value === "QR") {
     return `
       <span class="satisfaction-badge satisfaction-qr">
-        📝만족도 진행
+        <span class="satisfaction-text-pc">📝 만족도 진행</span>
+        <span class="satisfaction-text-mobile">📝 만족도 진행</span>
       </span>
     `;
   }
@@ -842,7 +847,12 @@ function getSatisfactionBadgeHtml(satisfaction) {
   if (value === "QR+출강부") {
     return `
       <span class="satisfaction-badge satisfaction-qr-book">
-        🚨만족도 진행 및 출강부 회수
+        <span class="satisfaction-text-pc">🚨 만족도 진행 및 출강부 회수</span>
+          <span class="satisfaction-icon">🚨 </span>
+          <span class="satisfaction-text">
+            만족도 진행,<br>
+            출강부 회수
+          </span>
       </span>
     `;
   }

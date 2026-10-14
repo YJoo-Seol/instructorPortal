@@ -13,6 +13,13 @@ let allAdminSchedules = [];
 // 운영진 일정 조회 중 여부
 let adminSchedulesLoading = false;
 
+// 현재 화면에 반영할 최신 요청 번호
+let adminDataRequestId = 0;
+
+// 주차별 최신 요청 번호
+// 이전 주 요청이 늦게 도착해도 해당 주 캐시는 저장할 수 있도록 관리
+let adminRequestLatestByWeek = {};
+
 // ==========================================================
 // 관리자 선택 날짜
 // ==========================================================
@@ -304,9 +311,15 @@ function logoutAdmin() {
 // 기존 단일 주간 캐시와도 호환
 // ============================================================
 
-function saveAdminDashboardCache() {
+function saveAdminDashboardCache(schedulesToSave, weekKeyOverride) {
   try {
-    const currentWeekKey = getAdminWeekKey(selectedAdminDate);
+    const currentWeekKey = String(
+      weekKeyOverride || getAdminWeekKey(selectedAdminDate),
+    ).trim();
+
+    if (!currentWeekKey) {
+      return;
+    }
 
     let cacheData = {
       weeks: {},
@@ -318,19 +331,9 @@ function saveAdminDashboardCache() {
       try {
         const parsed = JSON.parse(cached);
 
-        // ----------------------------------------------------
-        // 새 다중 주간 캐시
-        // ----------------------------------------------------
-
         if (parsed && parsed.weeks && typeof parsed.weeks === "object") {
           cacheData = parsed;
-        }
-
-        // ----------------------------------------------------
-        // 기존 단일 주간 캐시
-        // → 새 구조로 자동 변환
-        // ----------------------------------------------------
-        else if (parsed && Array.isArray(parsed.schedules)) {
+        } else if (parsed && Array.isArray(parsed.schedules)) {
           const oldWeekKey = String(parsed.weekKey || "").trim();
 
           if (oldWeekKey) {
@@ -345,12 +348,18 @@ function saveAdminDashboardCache() {
       }
     }
 
-    // --------------------------------------------------------
-    // 현재 주 캐시 저장
-    // --------------------------------------------------------
+    if (!cacheData.weeks || typeof cacheData.weeks !== "object") {
+      cacheData.weeks = {};
+    }
+
+    const schedules = Array.isArray(schedulesToSave)
+      ? schedulesToSave
+      : Array.isArray(allAdminSchedules)
+        ? allAdminSchedules
+        : [];
 
     cacheData.weeks[currentWeekKey] = {
-      schedules: Array.isArray(allAdminSchedules) ? allAdminSchedules : [],
+      schedules: schedules,
       savedAt: Date.now(),
     };
 
@@ -358,13 +367,11 @@ function saveAdminDashboardCache() {
 
     console.log("[운영진 대시보드] 주간 캐시 저장:", {
       weekKey: currentWeekKey,
-      schedules: Array.isArray(allAdminSchedules)
-        ? allAdminSchedules.length
-        : 0,
+      schedules: schedules.length,
       cachedWeeks: Object.keys(cacheData.weeks).length,
     });
-  } catch (e) {
-    console.warn("운영진 대시보드 캐시 저장 실패:", e);
+  } catch (error) {
+    console.warn("[운영진 대시보드] 주간 캐시 저장 실패:", error);
   }
 }
 
@@ -381,7 +388,7 @@ function saveAdminDashboardCache() {
 //   false 반환
 // ============================================================
 
-function loadAdminDashboardCache() {
+function loadAdminDashboardCache(weekKeyOverride) {
   try {
     const cached = sessionStorage.getItem(ADMIN_CACHE_KEY);
 
@@ -391,14 +398,100 @@ function loadAdminDashboardCache() {
 
     const data = JSON.parse(cached);
 
+    const requestedWeekKey = String(
+      weekKeyOverride || getAdminWeekKey(selectedAdminDate),
+    ).trim();
+
+    if (!requestedWeekKey) {
+      return false;
+    }
+
     // --------------------------------------------------------
-    // 새 다중 주간 캐시
+    // 주차별 캐시
     // --------------------------------------------------------
 
     if (data && data.weeks && typeof data.weeks === "object") {
-      const currentWeekKey = getAdminWeekKey(selectedAdminDate);
+      let repaired = false;
 
-      const weekCache = data.weeks[currentWeekKey];
+      const storedWeekKeys = Object.keys(data.weeks);
+
+      // 이전 비동기 응답이 잘못된 주차에 저장한 캐시 복구
+      storedWeekKeys.forEach(function (storedWeekKey) {
+        const weekCache = data.weeks[storedWeekKey];
+
+        if (
+          !weekCache ||
+          !Array.isArray(weekCache.schedules) ||
+          weekCache.schedules.length === 0
+        ) {
+          return;
+        }
+
+        const actualWeekKeys = new Set();
+        let allDatesValid = true;
+
+        weekCache.schedules.forEach(function (schedule) {
+          const dateText = String(schedule?.date || "").trim();
+
+          const match = dateText.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+          if (!match) {
+            allDatesValid = false;
+            return;
+          }
+
+          const date = new Date(
+            Number(match[1]),
+            Number(match[2]) - 1,
+            Number(match[3]),
+          );
+
+          if (Number.isNaN(date.getTime())) {
+            allDatesValid = false;
+            return;
+          }
+
+          actualWeekKeys.add(getAdminWeekKey(date));
+        });
+
+        // 모든 일정의 주차를 확실히 확인할 수 있을 때만 복구
+        if (!allDatesValid || actualWeekKeys.size !== 1) {
+          return;
+        }
+
+        const actualWeekKey = Array.from(actualWeekKeys)[0];
+
+        if (actualWeekKey === storedWeekKey) {
+          return;
+        }
+
+        const existingCache = data.weeks[actualWeekKey];
+
+        // 실제 주차에 캐시가 없거나 더 오래된 경우 복구
+        if (
+          !existingCache ||
+          !Array.isArray(existingCache.schedules) ||
+          Number(weekCache.savedAt || 0) > Number(existingCache.savedAt || 0)
+        ) {
+          data.weeks[actualWeekKey] = weekCache;
+        }
+
+        delete data.weeks[storedWeekKey];
+
+        repaired = true;
+
+        console.warn("[운영진 대시보드] 잘못된 주차 캐시 복구:", {
+          기존주차: storedWeekKey,
+          실제주차: actualWeekKey,
+          일정수: weekCache.schedules.length,
+        });
+      });
+
+      if (repaired) {
+        sessionStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(data));
+      }
+
+      const weekCache = data.weeks[requestedWeekKey];
 
       if (!weekCache || !Array.isArray(weekCache.schedules)) {
         return false;
@@ -407,7 +500,7 @@ function loadAdminDashboardCache() {
       allAdminSchedules = weekCache.schedules;
 
       console.log("[운영진 대시보드] 주간 캐시 적중:", {
-        weekKey: currentWeekKey,
+        weekKey: requestedWeekKey,
         schedules: allAdminSchedules.length,
       });
 
@@ -419,9 +512,40 @@ function loadAdminDashboardCache() {
     // --------------------------------------------------------
 
     if (data && Array.isArray(data.schedules)) {
-      const currentWeekKey = getAdminWeekKey(selectedAdminDate);
+      let oldWeekKey = String(data.weekKey || "").trim();
 
-      if (data.weekKey && data.weekKey !== currentWeekKey) {
+      // 기존 캐시에 주차 키가 없으면 일정 날짜로 주차 추론
+      if (!oldWeekKey && data.schedules.length > 0) {
+        const inferredWeekKeys = new Set();
+        let allDatesValid = true;
+
+        data.schedules.forEach(function (schedule) {
+          const match = String(schedule?.date || "").match(
+            /^(\d{4})-(\d{2})-(\d{2})/,
+          );
+
+          if (!match) {
+            allDatesValid = false;
+            return;
+          }
+
+          inferredWeekKeys.add(
+            getAdminWeekKey(
+              new Date(
+                Number(match[1]),
+                Number(match[2]) - 1,
+                Number(match[3]),
+              ),
+            ),
+          );
+        });
+
+        if (allDatesValid && inferredWeekKeys.size === 1) {
+          oldWeekKey = Array.from(inferredWeekKeys)[0];
+        }
+      }
+
+      if (oldWeekKey !== requestedWeekKey) {
         return false;
       }
 
@@ -431,23 +555,12 @@ function loadAdminDashboardCache() {
     }
 
     return false;
-  } catch (e) {
-    console.warn("운영진 대시보드 캐시 불러오기 실패:", e);
+  } catch (error) {
+    console.warn("[운영진 대시보드] 캐시 불러오기 실패:", error);
 
     return false;
   }
 }
-
-// ==========================================================
-// 관리자 일정 조회
-//
-// 동작
-// 1. 현재 선택 날짜가 속한 주간 캐시 확인
-// 2. 최신 데이터 조회 중에는 "일정 없음" 표시 안 함
-// 3. 이미 조회 중이면 중복 서버 요청 방지
-// 4. 최신 데이터 조회 완료 후에만 실제 일정 없음 판단
-// 5. 조회 실패 시 기존 데이터가 있으면 기존 화면 유지
-// ==========================================================
 
 // ==========================================================
 // 관리자 일정 조회
@@ -468,65 +581,65 @@ async function loadAdminData() {
   }
 
   // --------------------------------------------------------
-  // 이미 서버 조회 중이면 중복 요청 방지
-  // --------------------------------------------------------
-
-  if (adminSchedulesLoading) {
-    console.log("[운영진 대시보드] 이미 일정 조회 중 → 중복 조회 방지");
-    return;
-  }
-
-  adminSchedulesLoading = true;
-
-  // --------------------------------------------------------
-  // 현재 선택 날짜
+  // 요청 시작 시 날짜와 주차를 고정
+  // 응답을 기다리는 동안 날짜가 바뀌어도 요청 기준은 변하지 않음
   // --------------------------------------------------------
 
   const year = selectedAdminDate.getFullYear();
-
   const month = String(selectedAdminDate.getMonth() + 1).padStart(2, "0");
-
   const day = String(selectedAdminDate.getDate()).padStart(2, "0");
 
   const targetDate = `${year}-${month}-${day}`;
 
+  const requestWeekKey = getAdminWeekKey(new Date(`${targetDate}T00:00:00`));
+
+  const requestId = ++adminDataRequestId;
+
+  adminRequestLatestByWeek[requestWeekKey] = requestId;
+
+  // 같은 주 안에서 날짜만 바뀌면 같은 주의 응답은 여전히 활용 가능
+  function isCurrentRequest() {
+    return (
+      requestId === adminDataRequestId &&
+      getAdminWeekKey(selectedAdminDate) === requestWeekKey
+    );
+  }
+
+  // 같은 주에서 더 새로운 조회가 시작됐다면 오래된 결과로 캐시를 덮어쓰지 않음
+  function isLatestRequestForWeek() {
+    return adminRequestLatestByWeek[requestWeekKey] === requestId;
+  }
+
   // --------------------------------------------------------
-  // 캐시 확인
+  // 주간 캐시 확인
   // --------------------------------------------------------
 
-  const hasCache = loadAdminDashboardCache();
+  const hasCache = loadAdminDashboardCache(requestWeekKey);
 
   const emptyMessage = document.getElementById("emptyMessage");
 
   hideError();
 
-  // ========================================================
-  // 캐시 확인 후 로딩 표시 여부 결정
-  // ========================================================
+  if (hasCache) {
+    // 캐시가 있으면 일정 유무와 관계없이 바로 렌더링
+    // 해당 날짜 일정이 없으면 빈 일정 안내를 표시
+    adminSchedulesLoading = false;
 
-  const hasSchedulesForSelectedDate =
-    Array.isArray(allAdminSchedules) &&
-    allAdminSchedules.some(function (schedule) {
-      return schedule && String(schedule.date || "").trim() === targetDate;
-    });
-
-  if (hasCache && hasSchedulesForSelectedDate) {
-    console.log(
-      "[운영진 대시보드] 선택 날짜 캐시 있음 → 즉시 표시 후 최신 데이터 조회",
-    );
-
-    if (emptyMessage) {
-      emptyMessage.style.display = "none";
-    }
+    hideLoading();
 
     renderFilteredAdminSchedules();
-    hideLoading();
+
+    console.log("[운영진 대시보드] 캐시 즉시 표시:", {
+      weekKey: requestWeekKey,
+      date: targetDate,
+      schedules: allAdminSchedules.length,
+    });
   } else {
-    console.log(
-      hasCache
-        ? "[운영진 대시보드] 선택 날짜 일정 없음 → 최신 조회 로딩 표시"
-        : "[운영진 대시보드] 캐시 없음 → 로딩 표시",
-    );
+    // 캐시가 없는 주만 로딩 화면 표시
+    adminSchedulesLoading = true;
+
+    // 이전 주 데이터가 새 주 화면에 표시되지 않도록 초기화
+    allAdminSchedules = [];
 
     if (emptyMessage) {
       emptyMessage.style.display = "none";
@@ -536,11 +649,11 @@ async function loadAdminData() {
   }
 
   try {
-    // ======================================================
-    // 최신 데이터 조회
-    // ======================================================
-
-    console.log("[운영진 대시보드] 최신 데이터 조회:", targetDate);
+    console.log("[운영진 대시보드] 최신 데이터 조회:", {
+      date: targetDate,
+      weekKey: requestWeekKey,
+      requestId: requestId,
+    });
 
     const requestStart = performance.now();
 
@@ -553,7 +666,6 @@ async function loadAdminData() {
 
       body: JSON.stringify({
         action: "getAdminSchedules",
-
         date: targetDate,
       }),
     });
@@ -562,99 +674,103 @@ async function loadAdminData() {
 
     console.log("[운영진 대시보드] 서버 조회 완료:", requestElapsed + "ms");
 
-    // ======================================================
-    // HTTP 확인
-    // ======================================================
-
     if (!response.ok) {
       throw new Error("HTTP 오류: " + response.status);
     }
-
-    // ======================================================
-    // JSON
-    // ======================================================
 
     const result = await response.json();
 
     console.log("[운영진 API 전체 응답]", result);
 
-    // ======================================================
-    // 서버 결과 확인
-    // ======================================================
-
-    if (!result || result.success === false) {
+    if (
+      !result ||
+      result.success !== true ||
+      !Array.isArray(result.schedules)
+    ) {
       throw new Error(
         result && result.message
           ? result.message
-          : "운영진 일정 조회에 실패했습니다.",
+          : "운영진 일정 조회 응답이 올바르지 않습니다.",
       );
     }
 
-    // ======================================================
-    // 최신 일정
-    // ======================================================
+    const latestSchedules = result.schedules;
 
-    const latestSchedules = Array.isArray(result.schedules)
-      ? result.schedules
-      : [];
+    // --------------------------------------------------------
+    // 올바른 주차에 캐시 저장
+    //
+    // 화면에서 다른 주로 이동했더라도 요청 당시의 주차에 저장
+    // --------------------------------------------------------
 
-    // ======================================================
-    // 새 제출 보고 감지
-    // ======================================================
+    if (isLatestRequestForWeek()) {
+      saveAdminDashboardCache(latestSchedules, requestWeekKey);
+    }
+
+    // --------------------------------------------------------
+    // 현재 화면과 무관한 오래된 응답은 화면에 반영하지 않음
+    // --------------------------------------------------------
+
+    if (!isCurrentRequest()) {
+      console.log("[운영진 대시보드] 오래된 응답 화면 반영 제외:", {
+        응답날짜: targetDate,
+        응답주차: requestWeekKey,
+        현재날짜: formatAdminDateKey(selectedAdminDate),
+        현재요청번호: adminDataRequestId,
+        응답요청번호: requestId,
+      });
+
+      return;
+    }
+
+    // --------------------------------------------------------
+    // 현재 화면에 해당하는 최신 응답만 반영
+    // --------------------------------------------------------
 
     detectNewAdminReports(latestSchedules, false);
 
-    // ======================================================
-    // 현재 요청 결과 저장
-    // ======================================================
-
     allAdminSchedules = latestSchedules;
 
-    // ======================================================
-    // 캐시 갱신
-    // ======================================================
-
-    saveAdminDashboardCache();
-
-    // ======================================================
-    // 최신 데이터 반영
-    // ======================================================
-    // 로딩 상태를 먼저 종료
     adminSchedulesLoading = false;
 
     hideLoading();
 
+    hideError();
+
     renderFilteredAdminSchedules();
 
     console.log("[운영진 대시보드] 최신 데이터 갱신 완료:", {
-      일정수: allAdminSchedules.length,
-
-      서버조회시간: requestElapsed + "ms",
+      date: targetDate,
+      weekKey: requestWeekKey,
+      schedules: allAdminSchedules.length,
+      serverElapsedMs: requestElapsed,
     });
   } catch (error) {
-    console.error("운영진 대시보드 조회 오류:", error);
+    console.error("[운영진 대시보드] 일정 조회 오류:", error);
 
-    // ======================================================
-    // 캐시가 있으면 기존 캐시 화면 유지
-    // ======================================================
+    // 현재 화면과 무관한 요청의 오류는 화면을 변경하지 않음
+    if (!isCurrentRequest()) {
+      return;
+    }
 
-    if (hasCache && Array.isArray(allAdminSchedules)) {
-      console.warn("[운영진 대시보드] 최신 조회 실패 → 캐시 화면 유지");
-      // 로딩 상태를 먼저 종료
-      adminSchedulesLoading = false;
+    adminSchedulesLoading = false;
 
-      hideLoading();
+    hideLoading();
+
+    // --------------------------------------------------------
+    // 캐시가 있었다면 캐시 화면 유지
+    // --------------------------------------------------------
+
+    if (hasCache) {
+      console.warn("[운영진 대시보드] 최신 조회 실패 → 캐시 유지");
 
       renderFilteredAdminSchedules();
 
       return;
     }
 
-    // ======================================================
-    // 캐시도 없으면 오류 표시
-    // ======================================================
-
-    hideLoading();
+    // --------------------------------------------------------
+    // 캐시가 없으면 오류 표시
+    // --------------------------------------------------------
 
     const list = document.getElementById("adminList");
 
@@ -671,7 +787,10 @@ async function loadAdminData() {
       emptyMessage.style.display = "none";
     }
   } finally {
-    adminSchedulesLoading = false;
+    // 오래된 요청이 새 요청의 로딩 상태를 종료시키지 않도록 처리
+    if (isCurrentRequest()) {
+      adminSchedulesLoading = false;
+    }
   }
 }
 // ==========================================================
@@ -2131,7 +2250,8 @@ function getSatisfactionBadgeHtml(satisfaction) {
   if (value === "QR") {
     return `
       <span class="satisfaction-badge satisfaction-qr">
-        📝 만족도 진행
+        <span class="satisfaction-text-pc">📝 만족도 진행</span>
+        <span class="satisfaction-text-mobile">📝 만족도 진행</span>
       </span>
     `;
   }
@@ -2139,14 +2259,18 @@ function getSatisfactionBadgeHtml(satisfaction) {
   if (value === "QR+출강부") {
     return `
       <span class="satisfaction-badge satisfaction-qr-book">
-        🚨 만족도 진행 및 출강부 회수
+        <span class="satisfaction-text-pc">🚨 만족도 진행 및 출강부 회수</span>
+        <span class="satisfaction-icon">🚨 </span>
+        <span class="satisfaction-text">
+          만족도 진행,<br>
+          출강부 회수
+        </span>
       </span>
     `;
   }
 
   return "";
 }
-
 function initNewReportBadge() {
   updateNewReportBadge();
 }

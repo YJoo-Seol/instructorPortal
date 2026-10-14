@@ -1020,7 +1020,21 @@
   color: #dc2626 !important;
   font-weight: 700;
 }
+/* 기본: PC 문구 표시 */
+.satisfaction-text-mobile {
+  display: none;
+}
 
+/* 모바일: 축약 문구 표시 */
+@media (max-width: 768px) {
+  .satisfaction-text-pc {
+    display: none;
+  }
+
+  .satisfaction-text-mobile {
+    display: inline;
+  }
+}
 /* ============================================================
    운영진 대시보드 일정 조회 로딩
    ============================================================ */
