@@ -669,7 +669,7 @@ async function loadAdminData(forceFresh = false) {
 
     allAdminSchedules = [];
 
-    updateSummary(0, 0, 0);
+    updateSummary(0, 0, 0, 0);
 
     const list = document.getElementById("adminList");
 
@@ -1256,6 +1256,32 @@ function renderAdminData(schedules) {
   list.innerHTML = "";
 
   schedules = Array.isArray(schedules) ? schedules : [];
+
+  // 시작 시간 오름차순 → 같은 시간이면 시설명 가나다순
+  schedules.sort(function (a, b) {
+    function getStartMinutes(schedule) {
+      const time = String(schedule.startTime || schedule.time || "").trim();
+
+      const match = time.match(/(\d{1,2}):(\d{2})/);
+
+      if (!match) {
+        return Number.MAX_SAFE_INTEGER;
+      }
+
+      return Number(match[1]) * 60 + Number(match[2]);
+    }
+
+    const timeDifference = getStartMinutes(a) - getStartMinutes(b);
+
+    if (timeDifference !== 0) {
+      return timeDifference;
+    }
+
+    const facilityA = String(a.facilityName || "").trim();
+    const facilityB = String(b.facilityName || "").trim();
+
+    return facilityA.localeCompare(facilityB, "ko");
+  });
 
   let completeCount = 0;
   let incompleteCount = 0;
