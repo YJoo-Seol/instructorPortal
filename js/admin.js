@@ -2398,8 +2398,8 @@ function getSatisfactionBadgeHtml(satisfaction) {
     return `
       <span class="satisfaction-badge satisfaction-qr-book">
         <span class="satisfaction-text-pc">🚨 만족도 진행 및 출강부 회수</span>
-        <span class="satisfaction-icon">🚨 </span>
-        <span class="satisfaction-text">
+        <span class="satisfaction-text-mobile satisfaction-icon">🚨 </span>
+        <span class="satisfaction-text-mobile satisfaction-text">
           만족도 진행,<br>
           출강부 회수
         </span>

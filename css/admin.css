@@ -578,7 +578,9 @@
     margin: 16px auto;
     padding: 20px 14px;
   }
-
+  .satisfaction-text-mobile.satisfaction-text {
+    display: block;
+  }
   /* ==========================================================
      검색
      ========================================================== */
