@@ -146,7 +146,7 @@
 
 .summary-wrap {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -160,9 +160,31 @@
 }
 
 .summary-label {
-  margin-bottom: 5px;
   font-size: 13px;
-  color: #666;
+  color: #64748b;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* 전체 */
+.summary-item:not(.complete):not(.incomplete):not(.satisfaction)
+  .summary-label {
+  color: #475569;
+}
+
+/* 완료 */
+.summary-item.complete .summary-label {
+  color: #15803d;
+}
+
+/* 미제출 */
+.summary-item.incomplete .summary-label {
+  color: #b45309;
+}
+
+/* 만족도 */
+.summary-item.satisfaction .summary-label {
+  color: #2563eb;
 }
 
 .summary-number {
@@ -188,7 +210,14 @@
 .summary-item.incomplete .summary-number {
   color: #ea580c;
 }
+.summary-item.satisfaction {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
 
+.summary-item.satisfaction .summary-number {
+  color: #2563eb;
+}
 /* ============================================================
    5. 출강 목록
    ============================================================ */

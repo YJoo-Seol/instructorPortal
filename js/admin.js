@@ -1142,12 +1142,18 @@ function changeDate(offset) {
 // 요약
 // ==========================================================
 
-function updateSummary(total, complete, incomplete) {
+// ==========================================================
+// 요약
+// ==========================================================
+
+function updateSummary(total, complete, incomplete, satisfaction) {
   const totalElement = document.getElementById("totalCount");
 
   const completeElement = document.getElementById("completeCount");
 
   const incompleteElement = document.getElementById("incompleteCount");
+
+  const satisfactionElement = document.getElementById("satisfactionCount");
 
   if (totalElement) {
     totalElement.textContent = total;
@@ -1159,6 +1165,10 @@ function updateSummary(total, complete, incomplete) {
 
   if (incompleteElement) {
     incompleteElement.textContent = incomplete;
+  }
+
+  if (satisfactionElement) {
+    satisfactionElement.textContent = satisfaction;
   }
 }
 
@@ -1249,10 +1259,14 @@ function renderAdminData(schedules) {
 
   let completeCount = 0;
   let incompleteCount = 0;
+  let satisfactionCount = 0;
 
   schedules.forEach(function (schedule) {
     const card = createScheduleCard(schedule);
-
+    // 만족도 속성에 값이 있는 일정 집계
+    if (String(schedule.satisfaction || "").trim() !== "") {
+      satisfactionCount++;
+    }
     if (card) {
       list.appendChild(card);
     }
@@ -1286,7 +1300,12 @@ function renderAdminData(schedules) {
     }
   });
 
-  updateSummary(schedules.length, completeCount, incompleteCount);
+  updateSummary(
+    schedules.length,
+    completeCount,
+    incompleteCount,
+    satisfactionCount,
+  );
 
   // ============================================================
   // 일정 없음 표시
