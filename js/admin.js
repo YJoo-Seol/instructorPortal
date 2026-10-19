@@ -306,6 +306,9 @@ function logoutAdmin() {
   stopAdminAutoRefresh();
 
   sessionStorage.removeItem(ADMIN_AUTH_KEY);
+
+  // 운영진 대시보드 캐시 삭제
+  localStorage.removeItem(ADMIN_CACHE_KEY);
   sessionStorage.removeItem(ADMIN_CACHE_KEY);
 
   allAdminSchedules = [];
@@ -344,7 +347,10 @@ function saveAdminDashboardCache(schedulesToSave, weekKeyOverride) {
       weeks: {},
     };
 
-    const cached = sessionStorage.getItem(ADMIN_CACHE_KEY);
+    // 영구 캐시를 우선 사용하고, 없으면 기존 세션 캐시 사용
+    const cached =
+      localStorage.getItem(ADMIN_CACHE_KEY) ||
+      sessionStorage.getItem(ADMIN_CACHE_KEY);
 
     if (cached) {
       try {
@@ -381,8 +387,11 @@ function saveAdminDashboardCache(schedulesToSave, weekKeyOverride) {
       schedules: schedules,
       savedAt: Date.now(),
     };
+    // 캐시를 영구 저장
+    localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(cacheData));
 
-    sessionStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(cacheData));
+    // 이전 세션 캐시 정리
+    sessionStorage.removeItem(ADMIN_CACHE_KEY);
 
     console.log("[운영진 대시보드] 주간 캐시 저장:", {
       weekKey: currentWeekKey,
@@ -409,7 +418,27 @@ function saveAdminDashboardCache(schedulesToSave, weekKeyOverride) {
 
 function loadAdminDashboardCache(weekKeyOverride) {
   try {
-    const cached = sessionStorage.getItem(ADMIN_CACHE_KEY);
+    // 영구 캐시를 먼저 확인
+    let cached = localStorage.getItem(ADMIN_CACHE_KEY);
+
+    // 기존 버전의 세션 캐시가 있다면 가져와서 영구 저장소로 이전
+    if (!cached) {
+      cached = sessionStorage.getItem(ADMIN_CACHE_KEY);
+
+      if (cached) {
+        try {
+          localStorage.setItem(ADMIN_CACHE_KEY, cached);
+          sessionStorage.removeItem(ADMIN_CACHE_KEY);
+
+          console.log("[운영진 대시보드] 기존 세션 캐시를 영구 캐시로 이전");
+        } catch (migrationError) {
+          console.warn(
+            "[운영진 대시보드] 캐시 이전 실패, 기존 캐시 사용:",
+            migrationError,
+          );
+        }
+      }
+    }
 
     if (!cached) {
       return false;
@@ -507,7 +536,8 @@ function loadAdminDashboardCache(weekKeyOverride) {
       });
 
       if (repaired) {
-        sessionStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(data));
+        localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(data));
+        sessionStorage.removeItem(ADMIN_CACHE_KEY);
       }
 
       const weekCache = data.weeks[requestedWeekKey];
@@ -782,6 +812,20 @@ async function loadAdminData(forceFresh = false) {
     }
 
     const latestSchedules = result.schedules;
+    console.log(
+      "[강사 연락처 응답 확인]",
+      latestSchedules.map(function (schedule) {
+        return {
+          facilityName: schedule.facilityName,
+          mainTeacher: schedule.mainTeacher,
+          assistantTeacher: schedule.assistantTeacher,
+          teacherContacts: schedule.teacherContacts,
+          mainTeacherContacts: schedule.mainTeacherContacts,
+          assistantTeacherContacts: schedule.assistantTeacherContacts,
+          teacherContactDebug: schedule.teacherContactDebug,
+        };
+      }),
+    );
 
     // --------------------------------------------------------
     // 올바른 주차에 캐시 저장
@@ -1283,6 +1327,7 @@ function renderAdminData(schedules) {
     return facilityA.localeCompare(facilityB, "ko");
   });
 
+  let reportTargetCount = 0;
   let completeCount = 0;
   let incompleteCount = 0;
   let satisfactionCount = 0;
@@ -1296,6 +1341,13 @@ function renderAdminData(schedules) {
     if (card) {
       list.appendChild(card);
     }
+    // 보고 의무가 없는 원데이는 미제출로 집계하지 않음
+    if (String(schedule.area || "").trim() === "가을놀이터") {
+      return;
+    }
+
+    // 보고서 제출 대상 일정만 전체 집계
+    reportTargetCount++;
 
     // --------------------------------------------------------
     // 주강사 종료보고
@@ -1327,7 +1379,7 @@ function renderAdminData(schedules) {
   });
 
   updateSummary(
-    schedules.length,
+    reportTargetCount,
     completeCount,
     incompleteCount,
     satisfactionCount,
@@ -1482,6 +1534,108 @@ function getAdminAttendanceHtml(schedule, role, mismatch) {
 }
 
 // ==========================================================
+// 운영진 카드 시설 주소
+// ==========================================================
+
+function getAdminAddressHtml(schedule) {
+  const address = String(schedule?.address || "").trim();
+
+  if (!address) {
+    return "";
+  }
+
+  return `
+    <div class="dispatch-address">
+      📍 ${escapeHtml(address)}
+    </div>
+  `;
+}
+
+// ==========================================================
+// 강사명 + 전화 연결 HTML
+//
+// 연락처 데이터 형식:
+// teacherContacts: [
+//   { name: "홍길동", phone: "010-1234-5678" }
+// ]
+//
+// 단일 강사는 mainTeacherPhone / assistantTeacherPhone도 지원
+// ==========================================================
+
+function renderTeacherContactListHtml(schedule, rawNames) {
+  const names = String(rawNames || "")
+    .split(/[,，\n]/)
+    .map(function (name) {
+      return name.trim();
+    })
+    .filter(Boolean);
+
+  if (names.length === 0) {
+    return "-";
+  }
+
+  const contacts = [];
+
+  [
+    schedule?.teacherContacts,
+    schedule?.mainTeacherContacts,
+    schedule?.assistantTeacherContacts,
+  ].forEach(function (items) {
+    if (Array.isArray(items)) {
+      contacts.push(...items);
+    }
+  });
+
+  const teacherHtml = names.map(function (name) {
+    const contact = contacts.find(function (item) {
+      return String(item?.name || item?.teacherName || "").trim() === name;
+    });
+
+    let phone = String(
+      contact?.phone || contact?.phoneNumber || contact?.contact || "",
+    ).trim();
+
+    // 단일 주강사 연락처 필드 지원
+    if (!phone && name === getInstructorName(schedule?.mainTeacher)) {
+      phone = String(schedule?.mainTeacherPhone || "").trim();
+    }
+
+    // 단일 보조강사 연락처 필드 지원
+    if (!phone && name === getInstructorName(schedule?.assistantTeacher)) {
+      phone = String(schedule?.assistantTeacherPhone || "").trim();
+    }
+
+    const telNumber = phone.replace(/[^\d+]/g, "");
+
+    const phoneHtml =
+      phone && telNumber
+        ? `
+          <a
+            class="teacher-phone-link"
+            href="tel:${escapeHtml(telNumber)}"
+            aria-label="${escapeHtml(name)} 전화 연결"
+          >📱 ${escapeHtml(phone)}</a>
+        `
+        : "";
+
+    return `
+      <span class="teacher-contact-line">
+        <span class="teacher-contact-name">
+          ${escapeHtml(name)}
+        </span>
+        ${phoneHtml}
+      </span>
+    `;
+  });
+
+  return `
+    <span class="teacher-contact-list">
+      ${teacherHtml.join("")}
+    </span>
+  `;
+}
+
+// ==========================================================
 // 관리자 일정 카드 생성
 // ==========================================================
 
@@ -1489,16 +1643,133 @@ function createScheduleCard(schedule) {
   if (!schedule) {
     return null;
   }
-
+  console.log(
+    "[가을놀이터 분기 확인]",
+    schedule.facilityName,
+    "일정명:",
+    schedule.schedule,
+    "분기:",
+    String(schedule.area || "").trim() === "가을놀이터",
+  );
   const card = document.createElement("div");
   card.className = "dispatch-card";
 
+  // ========================================================
+  // 가을놀이터 전용 카드
+  // 보고 상태 없이 시설명과 전체 강사명 표시
+  // ========================================================
+
+  if (String(schedule.area || "").trim() === "가을놀이터") {
+    card.classList.add("one-day-card");
+
+    const facilityName = escapeHtml(schedule.facilityName || "-");
+    const satisfactionBadge = getSatisfactionBadgeHtml(schedule.satisfaction);
+    const addressHtml = getAdminAddressHtml(schedule);
+
+    const startTime = String(schedule.startTime || schedule.time || "").trim();
+
+    const endTime = String(schedule.endTime || "").trim();
+
+    let timeText = "-";
+
+    if (startTime && endTime) {
+      timeText = startTime + "~" + endTime;
+    } else if (startTime) {
+      timeText = startTime;
+    }
+
+    const target = escapeHtml(schedule.target || "-");
+
+    const mainTeacher = getInstructorName(schedule.mainTeacher);
+
+    // 예전 캐시에 운영진 대체가 남아 있더라도 강사명으로 표시하지 않음
+    const assistantTeacher =
+      schedule.assistantIsOperations === true
+        ? ""
+        : getInstructorName(schedule.assistantTeacher);
+
+    // ========================================================
+    // 주강사 / 보조강사 이름 정리
+    // ========================================================
+
+    // 주강사 이름 중복 제거
+    const mainTeacherNames = Array.from(
+      new Set(
+        String(mainTeacher || "")
+          .split(",")
+          .map(function (name) {
+            return name.trim();
+          })
+          .filter(Boolean),
+      ),
+    ).join(", ");
+
+    // 보조강사 이름 중복 제거
+    const assistantTeacherNames = Array.from(
+      new Set(
+        String(assistantTeacher || "")
+          .split(",")
+          .map(function (name) {
+            return name.trim();
+          })
+          .filter(Boolean),
+      ),
+    ).join(", ");
+
+    // ========================================================
+    // 가을놀이터 전용 카드 HTML
+    // ========================================================
+
+    card.innerHTML = `
+  <div class="dispatch-header">
+    <div class="dispatch-title">
+      <span class="facility-name">${facilityName}</span>
+      ${satisfactionBadge}
+    </div>
+  </div>
+
+  <div class="dispatch-info">
+    <span class="time">${escapeHtml(timeText)}</span>
+    <span class="info-divider">|</span>
+    <span>${target}</span>
+  </div>
+
+${addressHtml}
+
+  <div class="teacher-list">
+
+    <!-- 주강사 -->
+    <div class="teacher-block">
+      <div class="teacher-type">주강사</div>
+      <div class="teacher-row">
+        <div class="teacher-name">
+          ${renderTeacherContactListHtml(schedule, mainTeacherNames || "-")}
+        </div>
+      </div>
+    </div>
+
+    <!-- 보조강사 -->
+    <div class="teacher-block">
+      <div class="teacher-type">보조강사</div>
+      <div class="teacher-row">
+        <div class="teacher-name">
+         ${renderTeacherContactListHtml(schedule, assistantTeacherNames || "-")}
+        </div>
+      </div>
+    </div>
+
+  </div>
+`;
+
+    return card;
+  }
   // ========================================================
   // 기본 정보
   // ========================================================
 
   const facilityName = escapeHtml(schedule.facilityName || "-");
   const satisfactionBadge = getSatisfactionBadgeHtml(schedule.satisfaction);
+  const addressHtml = getAdminAddressHtml(schedule);
 
   const startTime = String(schedule.startTime || schedule.time || "").trim();
   const endTime = String(schedule.endTime || "").trim();
@@ -1521,6 +1792,18 @@ function createScheduleCard(schedule) {
   const mainTeacher = getInstructorName(schedule.mainTeacher);
   const assistantTeacher = getInstructorName(schedule.assistantTeacher);
   const assistantIsOperations = schedule.assistantIsOperations === true;
+  const mainTeacherHtml = renderTeacherContactListHtml(
+    schedule,
+    mainTeacher || "-",
+  );
+
+  const assistantTeacherDisplayName = assistantIsOperations
+    ? "운영진 대체"
+    : assistantTeacher || "-";
+
+  const assistantTeacherHtml = assistantIsOperations
+    ? escapeHtml(assistantTeacherDisplayName)
+    : renderTeacherContactListHtml(schedule, assistantTeacherDisplayName);
 
   // ========================================================
   // 보고 상태
@@ -1626,6 +1909,8 @@ function createScheduleCard(schedule) {
       <span>${target}</span>
     </div>
 
+         ${addressHtml}
+
     <div class="teacher-list">
 
       <!-- 주강사 -->
@@ -1639,8 +1924,8 @@ function createScheduleCard(schedule) {
         <div class="teacher-row">
 
           <div class="teacher-name">
-            ${escapeHtml(mainTeacher || "-")}
-          </div>
+  ${mainTeacherHtml}
+</div>
 
           <div class="report-status-wrap">
 
@@ -1695,10 +1980,8 @@ function createScheduleCard(schedule) {
         <div class="teacher-row">
 
           <div class="teacher-name">
-            ${escapeHtml(
-              assistantIsOperations ? "운영진 대체" : assistantTeacher || "-",
-            )}
-          </div>
+  ${assistantTeacherHtml}
+</div>
 
           <div class="assistant-status">
 
@@ -2324,7 +2607,10 @@ function detectNewAdminReports(schedules, isInitialState) {
     if (!schedule) {
       return;
     }
-
+    // 가을놀이터는 새 보고 알림 대상에서 제외
+    if (String(schedule.area || "").trim() === "가을놀이터") {
+      return;
+    }
     const scheduleKey = getAdminReportScheduleKey(schedule);
 
     if (!scheduleKey) {

@@ -3,7 +3,6 @@
    ============================================================ */
 
 .admin-container {
-  width: 100%;
   max-width: 1200px;
   width: calc(100% - 24px);
   margin: 40px auto;
@@ -39,6 +38,7 @@
   text-align: center;
   white-space: nowrap;
 }
+
 .new-report-badge {
   display: none;
   align-items: center;
@@ -61,6 +61,7 @@
 .new-report-badge:hover {
   background: #b91c1c;
 }
+
 .instructor-number {
   margin: 10px 0;
   font-size: 13px;
@@ -210,6 +211,7 @@
 .summary-item.incomplete .summary-number {
   color: #ea580c;
 }
+
 .summary-item.satisfaction {
   background: #eff6ff;
   border-color: #bfdbfe;
@@ -218,6 +220,7 @@
 .summary-item.satisfaction .summary-number {
   color: #2563eb;
 }
+
 /* ============================================================
    5. 출강 목록
    ============================================================ */
@@ -251,7 +254,6 @@
 
 .dispatch-title {
   display: flex;
-  align-items: center;
   justify-content: space-between;
   gap: 7px;
   width: 100%;
@@ -270,16 +272,16 @@
 .dispatch-info {
   display: flex;
   align-items: center;
-  /* justify-self: center; */
   gap: 7px;
   padding: 10px 18px;
   font-size: 14px;
   color: #555;
-  /* border-bottom: 1px solid #f1f5f9; */
 }
+
 .dispatch-info .time {
   font-weight: 600;
 }
+
 .info-divider {
   color: #aaa;
 }
@@ -287,220 +289,141 @@
 /* ============================================================
    7. 강사 목록
    PC / 태블릿 = 주강사 | 보조강사 2열
-   역할 + 강사명 한 줄
-   보고는 하단
+   역할 + 강사명 한 줄, 보고는 하단
    ============================================================ */
 
 .teacher-list {
   width: 100%;
   max-width: 800px;
-
   margin: 10px auto 14px;
   padding: 14px 10px 16px;
-
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-
   box-sizing: border-box;
 }
-
-/* ============================================================
-   주강사 / 보조강사 블록
-   ============================================================ */
 
 .teacher-block {
   min-width: 0;
   padding-left: 24px;
-
   display: grid;
-
   grid-template-columns: max-content max-content;
   grid-template-rows: auto auto;
-
   column-gap: 8px;
   row-gap: 4px;
-
   justify-content: center;
   align-items: center;
-
   box-sizing: border-box;
 }
-
-/* ============================================================
-   보조강사 영역 구분
-   ============================================================ */
 
 .teacher-block + .teacher-block {
   margin-top: 0;
   padding-left: 24px;
 }
 
-/* ============================================================
-   주강사 / 보조강사 서브 타이틀
-   ============================================================ */
-
 .teacher-type {
   grid-column: 1;
   grid-row: 1;
-
   width: auto;
   margin: 0;
-
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 28px;
-
   color: #666;
-
   text-align: left;
 }
-
-/* ============================================================
-   강사명
-   ============================================================ */
 
 .teacher-row {
   display: contents;
 }
 
-/*
-   teacher-row를 contents로 만들기 때문에
-   teacher-name이 teacher-block의 grid에 직접 참여
-*/
-
 .teacher-name {
   grid-column: 2;
   grid-row: 1;
-
   min-width: 0;
   font-size: 18px;
   font-weight: 800;
   line-height: 28px;
-
   color: #222;
-
   white-space: nowrap;
   text-align: left;
 }
 
-/* ============================================================
-   주강사 보고
-   ============================================================ */
-
+/* 주강사 종료보고와 출석 인원을 세로로 배치 */
 .report-status-wrap {
   grid-column: 1 / -1;
   grid-row: 2;
-
   min-width: 0;
-
   display: flex;
+  flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
-
+  gap: 4px;
   padding-left: 0;
 }
-
-/* ============================================================
-   보조강사 보고
-   ============================================================ */
 
 .assistant-status {
   grid-column: 1 / -1;
   grid-row: 2;
-
   min-width: 0;
-
   display: flex;
   flex-direction: column;
-
   justify-content: flex-start;
   align-items: flex-start;
-
   gap: 3px;
 }
-
-/* ============================================================
-   각각의 보고 한 줄
-   ============================================================ */
 
 .report-item,
 .assistant-report-item {
   min-height: 28px;
-
   display: flex;
   align-items: center;
-
   white-space: nowrap;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 /* ============================================================
-   보고 상태 박스
-   기존 색상 유지
+   8. 보고 상태 박스
    ============================================================ */
 
 .status {
   display: inline-flex;
   align-items: center;
-
   min-height: 28px;
-
   padding: 5px 9px;
-
   border-radius: 6px;
-
   font-size: 12px;
   font-weight: 700;
   line-height: 1.2;
-
   box-sizing: border-box;
-
   white-space: nowrap;
 }
-
-/* 제출 완료 */
 
 .status-complete {
   color: #15803d;
   background: #dcfce7;
 }
 
-/* 미제출 */
-
 .status-incomplete {
   color: #c2410c;
   background: #ffedd5;
 }
-
-/* 해당 없음 */
 
 .status-none {
   color: #999;
   background: #f3f4f6;
 }
 
-/* ============================================================
-   보고 시간
-   박스 바깥에 별도 표시
-   ============================================================ */
-
 .report-time {
   display: inline-flex;
   align-items: center;
-
   margin-left: 6px;
-
   font-size: 12px;
   font-weight: 700;
   line-height: 28px;
-
   color: #15803d;
-
   white-space: nowrap;
 }
-
-/* ============================================================
-   기타 대체 운영진 관련
-   ============================================================ */
 
 .substitute {
   background: #fafafa;
@@ -508,20 +431,15 @@
 
 .substitute-label {
   margin-right: 8px;
-
   font-size: 12px;
   font-weight: 700;
-
   color: #6b7280;
 }
 
 .substitute-status {
   display: flex;
-
   justify-content: flex-end;
-
   gap: 6px;
-
   flex-wrap: wrap;
 }
 
@@ -601,18 +519,16 @@
   font-weight: 400;
 }
 
+/* ============================================================
+   11. 모바일 레이아웃
+   ============================================================ */
+
 @media screen and (max-width: 768px) {
   .container {
     width: calc(100% - 24px);
     margin: 16px auto;
     padding: 20px 14px;
   }
-  .satisfaction-text-mobile.satisfaction-text {
-    display: block;
-  }
-  /* ==========================================================
-     검색
-     ========================================================== */
 
   .admin-search {
     flex-wrap: wrap;
@@ -628,10 +544,6 @@
     flex: 1;
   }
 
-  /* ==========================================================
-     요약
-     ========================================================== */
-
   .summary-wrap {
     gap: 8px;
   }
@@ -644,10 +556,6 @@
     font-size: 22px;
   }
 
-  /* ==========================================================
-     카드
-     ========================================================== */
-
   .dispatch-header {
     align-items: flex-start;
     flex-direction: column;
@@ -657,262 +565,120 @@
   .dispatch-title {
     font-size: 18px;
     color: #406093;
-    text-align: center;
   }
-
-  /* ==========================================================
-     강사 목록
-     모바일 = 1열
-     ========================================================== */
 
   .teacher-list {
     width: 100%;
     max-width: none;
-
     margin: 10px 0 14px;
     padding: 14px 16px 16px;
-
     display: block;
-
     box-sizing: border-box;
   }
-
-  /* ==========================================================
-     주강사 / 보조강사 블록
-     ========================================================== */
 
   .teacher-block {
     width: 100%;
     min-width: 0;
-
     display: grid;
-
-    /*
-      첫 번째 줄
-      [주강사] [강사명]
-
-      두 번째 줄
-      [보고 ----------------]
-    */
-
     grid-template-columns: max-content minmax(0, 1fr);
     grid-template-rows: auto auto;
-
     column-gap: 10px;
     row-gap: 10px;
-
     justify-content: start;
     align-items: center;
-
     box-sizing: border-box;
   }
-
-  /* ==========================================================
-     주강사 → 보조강사 구분
-     기존 구분선 유지
-     ========================================================== */
 
   .teacher-block + .teacher-block {
     margin-top: 16px;
     padding-top: 14px;
-
     border-top: 1px solid #e5e7eb;
   }
-
-  /* ==========================================================
-     주강사 / 보조강사 서브타이틀
-     기존 왼쪽 파란 보더 유지
-     ========================================================== */
 
   .teacher-type {
     grid-column: 1;
     grid-row: 1;
-
     width: auto;
-
     margin: 0;
     padding-left: 8px;
-
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 500;
     line-height: 28px;
-
     color: #406093;
-
     text-align: left;
     white-space: nowrap;
-
     border-left: 3px solid #4c8ce4;
-
     box-sizing: border-box;
   }
-
-  /* ==========================================================
-     기존 teacher-row는 레이아웃 껍데기만 제거
-     안쪽 요소가 teacher-block의 grid에 직접 참여
-     ========================================================== */
 
   .teacher-row {
     display: contents;
   }
 
-  /* ==========================================================
-     강사명
-     서브타이틀 우측에 바로 표시
-     ========================================================== */
-
   .teacher-name {
     grid-column: 2;
     grid-row: 1;
-
     min-width: 0;
     font-size: 18px;
     font-weight: 800;
     line-height: 28px;
-
     color: #222;
-
     text-align: left;
     white-space: nowrap;
   }
 
-  /* ==========================================================
-     주강사 종료보고
-     서브타이틀 바로 아래
-     ========================================================== */
-
   .report-status-wrap {
     grid-column: 1 / -1;
     grid-row: 2;
-
     min-width: 0;
-
     display: flex;
-
+    flex-direction: column;
     justify-content: flex-start;
     align-items: flex-start;
-
     box-sizing: border-box;
   }
-
-  /* ==========================================================
-     보조강사 시작 / 종료보고
-     서브타이틀 바로 아래에서 세로 배치
-     ========================================================== */
 
   .assistant-status {
     grid-column: 1 / -1;
     grid-row: 2;
-
     min-width: 0;
-
     display: flex;
     flex-direction: column;
-
     justify-content: flex-start;
     align-items: flex-start;
-
     gap: 3px;
-
     box-sizing: border-box;
   }
-
-  /* ==========================================================
-     보고 한 줄
-     ========================================================== */
 
   .report-item,
   .assistant-report-item {
     min-height: 28px;
-
     display: flex;
     align-items: center;
-
     white-space: nowrap;
-
+    flex-wrap: wrap;
+    gap: 6px;
     box-sizing: border-box;
   }
-
-  /* ==========================================================
-     보고 상태 박스
-     ========================================================== */
 
   .status {
     display: inline-flex;
     align-items: center;
-
     min-height: 28px;
-
     padding: 5px 9px;
-
     border-radius: 6px;
-
     font-size: 12px;
     font-weight: 700;
     line-height: 1.2;
-
     box-sizing: border-box;
-
     white-space: nowrap;
-  }
-
-  /* 제출 완료 */
-
-  .status-complete {
-    color: #15803d;
-    background: #dcfce7;
-  }
-
-  /* 미제출 */
-
-  .status-incomplete {
-    color: #c2410c;
-    background: #ffedd5;
-  }
-
-  /* 해당 없음 */
-
-  .status-none {
-    color: #999;
-    background: #f3f4f6;
-  }
-
-  /* ==========================================================
-     보고 시간
-     박스 바깥 오른쪽
-     ========================================================== */
-
-  .report-time {
-    display: inline-flex;
-    align-items: center;
-
-    margin-left: 6px;
-
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 28px;
-
-    color: #15803d;
-
-    white-space: nowrap;
-  }
-
-  /* ==========================================================
-     대체 운영진
-     ========================================================== */
-
-  .substitute {
-    background: #fafafa;
   }
 
   .substitute-label {
     margin: 0;
-
     font-size: 12px;
     font-weight: 700;
-
     color: #6b7280;
-
     text-align: left;
   }
 
@@ -971,13 +737,14 @@
 }
 
 /* ============================================================
-   12. 반응형 미디어 쿼리
+   13. PC 강사 구분선 및 타이틀
    ============================================================ */
 
 @media screen and (min-width: 769px) {
   .teacher-block + .teacher-block {
     border-left: 1px solid #e5e7eb;
   }
+
   .teacher-type {
     grid-column: 1;
     grid-row: 1;
@@ -985,7 +752,7 @@
     margin: 0;
     padding-left: 8px;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 500;
     line-height: 28px;
     color: #406093;
     text-align: left;
@@ -993,14 +760,15 @@
     border-left: 3px solid #4c8ce4;
     box-sizing: border-box;
   }
+
   .teacher-block {
     gap: 10px;
   }
 }
 
-/* =========================================================
-   운영진 대시보드 만족도 배지
-   ========================================================= */
+/* ============================================================
+   14. 만족도 배지
+   ============================================================ */
 
 .satisfaction-badge {
   display: inline-flex;
@@ -1015,7 +783,6 @@
   white-space: nowrap;
 }
 
-/* 만족도 QR */
 .satisfaction-qr {
   background: #eef6ff;
   color: #3574b8;
@@ -1023,7 +790,6 @@
   animation: satisfaction-alert 1.2s ease-in-out infinite;
 }
 
-/* 만족도 QR + 출강부 */
 .satisfaction-qr-book {
   background: #fff4e5;
   color: #c56b00;
@@ -1042,6 +808,24 @@
   }
 }
 
+.satisfaction-text-mobile {
+  display: none;
+}
+
+@media screen and (max-width: 768px) {
+  .satisfaction-text-pc {
+    display: none;
+  }
+
+  .satisfaction-text-mobile {
+    display: inline;
+  }
+
+  .satisfaction-text-mobile.satisfaction-text {
+    display: block;
+  }
+}
+
 .date-nav-arrow.disabled {
   opacity: 0.35;
   color: #999;
@@ -1051,23 +835,9 @@
   color: #dc2626 !important;
   font-weight: 700;
 }
-/* 기본: PC 문구 표시 */
-.satisfaction-text-mobile {
-  display: none;
-}
 
-/* 모바일: 축약 문구 표시 */
-@media (max-width: 768px) {
-  .satisfaction-text-pc {
-    display: none;
-  }
-
-  .satisfaction-text-mobile {
-    display: inline;
-  }
-}
 /* ============================================================
-   운영진 대시보드 일정 조회 로딩
+   15. 운영진 대시보드 로딩
    ============================================================ */
 
 .admin-schedule-area {
@@ -1077,80 +847,60 @@
 .admin-loading-overlay {
   width: 100%;
   min-height: 220px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   box-sizing: border-box;
 }
 
 .admin-loading-box {
   width: min(360px, calc(100% - 40px));
-
   text-align: center;
 }
 
 .admin-loading-title {
   margin-bottom: 8px;
-
   font-size: 15px;
   font-weight: 700;
-
   color: #406093;
 }
 
 .admin-loading-subtitle {
   margin-bottom: 18px;
-
   font-size: 13px;
   color: #7a8491;
 }
 
 .admin-loading-bar {
   position: relative;
-
   width: 100%;
   height: 6px;
-
   overflow: hidden;
-
   border-radius: 999px;
-
   background: #e9edf3;
 }
 
 .admin-loading-bar::before {
   content: "";
-
   position: absolute;
   top: 0;
   left: -35%;
-
   width: 35%;
   height: 100%;
-
   border-radius: 999px;
-
   background: linear-gradient(90deg, #406093 0%, #4c8ce4 50%, #91d06c 100%);
-
   animation: adminLoadingMove 1.4s ease-in-out infinite;
 }
 
 .admin-loading-bar::after {
   content: "";
-
   position: absolute;
   top: 0;
   left: -20%;
-
   width: 20%;
   height: 100%;
-
   background: rgba(255, 255, 255, 0.45);
-
   transform: skewX(-20deg);
-
   animation: adminLoadingShine 1.4s linear infinite;
 }
 
@@ -1189,15 +939,10 @@
     width: 100%;
   }
 }
-/* ============================================================
-   운영진 대시보드 차시별 출석현황
-   ============================================================ */
 
-.report-item,
-.assistant-report-item {
-  flex-wrap: wrap;
-  gap: 6px;
-}
+/* ============================================================
+   16. 차시별 출석현황
+   ============================================================ */
 
 .attendance-wrap {
   display: inline-flex;
@@ -1211,29 +956,37 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   min-height: 26px;
-
   padding: 4px 7px;
-
   border-radius: 5px;
-
   background: #f3f4f6;
   color: #555;
-
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
-
   white-space: nowrap;
   box-sizing: border-box;
 }
 
-/* 주강사 / 보조강사 출석인원 불일치 */
 .attendance-mismatch {
   background: #fee2e2;
   color: #dc2626;
   border: 1px solid #fecaca;
+}
+
+.attendance-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.attendance-row .attendance-wrap {
+  margin-left: 0;
+  gap: 4px;
 }
 
 @media screen and (max-width: 380px) {
@@ -1249,37 +1002,209 @@
 }
 
 /* ============================================================
-   운영진 대시보드
-   종료보고와 출석 인원 분리
+   17. 가을놀이터 전용 카드
+   시설명 / 복수 강사명 줄바꿈
+   PC: 기존 2열 레이아웃, 모바일: 1열 레이아웃
    ============================================================ */
 
-/* 주강사 종료보고와 출석 인원을 세로로 배치 */
-.report-status-wrap {
+.one-day-card .dispatch-title {
+  align-items: flex-start;
+}
+
+.one-day-card .facility-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media screen and (max-width: 768px) {
+  .one-day-card .teacher-list {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin: 10px 0 14px;
+    padding: 14px 16px 16px;
+    box-sizing: border-box;
+  }
+
+  .one-day-card .teacher-block {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-rows: auto;
+    justify-content: stretch;
+    align-items: start;
+    width: 100%;
+    min-width: 0;
+    padding-left: 0;
+    box-sizing: border-box;
+  }
+
+  .one-day-card .teacher-block + .teacher-block {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #e5e7eb;
+    border-left: none;
+  }
+
+  .one-day-card .teacher-name {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.6;
+  }
+}
+
+/* ============================================================
+   18. 시설 주소
+   ============================================================ */
+
+.dispatch-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+  margin: 0 18px 8px;
+  padding: 0;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dispatch-address-icon {
+  flex: 0 0 auto;
+}
+
+.dispatch-address-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   19. 강사 연락처
+   이름은 크게, 전화번호는 작고 차분하게 표시
+   ============================================================ */
+
+.teacher-contact-list {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: flex-start;
-  gap: 4px;
+  gap: 3px;
+  width: 100%;
   min-width: 0;
 }
 
-/* 출석 인원 전용 줄 */
-.attendance-row {
+.teacher-contact-line {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
   width: 100%;
   min-width: 0;
+  min-height: 28px;
+}
+
+.teacher-contact-name {
+  color: #222;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 28px;
+  overflow-wrap: anywhere;
+}
+
+.teacher-phone-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #526b8a;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 28px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.teacher-phone-link:hover,
+.teacher-phone-link:focus-visible {
+  color: #2f5480;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.teacher-phone-link:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+/* 연락처가 있는 블록에만 그리드 조정 적용 */
+.teacher-block:has(.teacher-contact-list) {
+  grid-template-columns: max-content minmax(0, 1fr);
+  justify-content: stretch;
+  align-items: start;
+}
+
+.teacher-block:has(.teacher-contact-list) .teacher-type {
+  display: flex;
+  align-items: center;
+  align-self: start;
+  min-height: 28px;
+  line-height: 1;
   box-sizing: border-box;
 }
 
-/* 출석 인원 줄은 종료보고 시간과 간격 없이 정렬 */
-.attendance-row .attendance-wrap {
-  margin-left: 0;
+.teacher-block:has(.teacher-contact-list) .teacher-name {
+  align-self: start;
+  min-width: 0;
+  margin-top: 0;
+  line-height: 28px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-/* 출석 인원 줄 안의 항목 간격 */
-.attendance-row .attendance-wrap {
-  gap: 4px;
+@media screen and (max-width: 768px) {
+  .dispatch-address {
+    margin: 0 16px 8px;
+    font-size: 12px;
+  }
+
+  .teacher-block:has(.teacher-contact-list) {
+    grid-template-columns: max-content minmax(0, 1fr);
+    justify-content: stretch;
+  }
+
+  .teacher-contact-list {
+    gap: 3px;
+  }
+
+  .teacher-contact-name {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .teacher-phone-link {
+    padding: 0;
+    font-size: 12px;
+  }
+}
+
+@media screen and (max-width: 380px) {
+  .teacher-contact-name {
+    font-size: 15px;
+  }
+
+  .teacher-phone-link {
+    font-size: 11px;
+  }
 }

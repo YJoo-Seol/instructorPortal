@@ -527,7 +527,6 @@ async function loadReportSchedules(data) {
     // ------------------------------------------------------
     if (!result.ok) {
       const errorText = await result.text();
-
       throw new Error("서버 응답 오류 (" + result.status + "): " + errorText);
     }
 
@@ -536,6 +535,37 @@ async function loadReportSchedules(data) {
     // ------------------------------------------------------
     const response = await result.json();
 
+    // ------------------------------------------------------
+    // Notion API 상세 진단
+    // ------------------------------------------------------
+    if (response.timing && response.timing.apiDiagnostics) {
+      const apiDiagnostics = response.timing.apiDiagnostics;
+
+      console.log("========== Notion API 진단 ==========");
+      console.table({
+        apiRequestCount: apiDiagnostics.apiRequestCount,
+        apiFetchMs: apiDiagnostics.apiFetchMs,
+        apiParseMs: apiDiagnostics.apiParseMs,
+        apiErrorCount: apiDiagnostics.apiErrorCount,
+        relationMemoryCacheHit: apiDiagnostics.relationMemoryCacheHit,
+        relationScriptCacheHit: apiDiagnostics.relationScriptCacheHit,
+        relationApiCalls: apiDiagnostics.relationApiCalls,
+        relationApiMs: apiDiagnostics.relationApiMs,
+        databaseCacheReadMs: apiDiagnostics.databaseCacheReadMs,
+        databaseCacheHit: apiDiagnostics.databaseCacheHit,
+        databaseApiMs: apiDiagnostics.databaseApiMs,
+        databaseApiCalls: apiDiagnostics.databaseApiCalls,
+        relationCacheReadMs: apiDiagnostics.relationCacheReadMs,
+        relationApiErrors: apiDiagnostics.relationApiErrors,
+      });
+
+      console.log("========== Notion API 요청별 상세 ==========");
+      console.table(apiDiagnostics.requests || []);
+    }
+
+    // ------------------------------------------------------
+    // 강사 일정 서버 결과
+    // ------------------------------------------------------
     console.log("========== 강사 일정 서버 결과 ==========", {
       success: response.success,
       message: response.message,
@@ -2945,8 +2975,8 @@ async function compressImageFile(file) {
   // 이미지 압축 설정
   // ========================================
 
-  const maxWidth = 2560;
-  const maxHeight = 2560;
+  const maxWidth = 4000;
+  const maxHeight = 4000;
   const jpegQuality = 0.92;
 
   return new Promise(function (resolve, reject) {
