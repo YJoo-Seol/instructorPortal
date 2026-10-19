@@ -1287,7 +1287,9 @@ function hideError() {
 }
 
 // ==========================================================
-// 관리자 일정 목록 렌더링
+// 관리자 일정 목록 렌더링 및 요약 집계
+// 전체: 모든 일정
+// 완료 / 미제출: 보고 대상 일정만 집계
 // ==========================================================
 
 function renderAdminData(schedules) {
@@ -1327,27 +1329,36 @@ function renderAdminData(schedules) {
     return facilityA.localeCompare(facilityB, "ko");
   });
 
-  let reportTargetCount = 0;
   let completeCount = 0;
   let incompleteCount = 0;
   let satisfactionCount = 0;
 
   schedules.forEach(function (schedule) {
-    const card = createScheduleCard(schedule);
-    // 만족도 속성에 값이 있는 일정 집계
-    if (String(schedule.satisfaction || "").trim() !== "") {
-      satisfactionCount++;
-    }
-    if (card) {
-      list.appendChild(card);
-    }
-    // 보고 의무가 없는 원데이는 미제출로 집계하지 않음
-    if (String(schedule.area || "").trim() === "가을놀이터") {
+    if (!schedule) {
       return;
     }
 
-    // 보고서 제출 대상 일정만 전체 집계
-    reportTargetCount++;
+    // 일정 카드는 모든 프로그램 표시
+    const card = createScheduleCard(schedule);
+
+    if (card) {
+      list.appendChild(card);
+    }
+
+    // 만족도 집계도 기존대로 모든 일정 대상
+    if (String(schedule.satisfaction || "").trim() !== "") {
+      satisfactionCount++;
+    }
+
+    // --------------------------------------------------------
+    // 가을놀이터 원데이 프로그램
+    // 일정 및 전체 건수에는 포함
+    // 완료 / 미제출 보고 집계에서만 제외
+    // --------------------------------------------------------
+
+    if (String(schedule.area || "").trim() === "가을놀이터") {
+      return;
+    }
 
     // --------------------------------------------------------
     // 주강사 종료보고
@@ -1378,8 +1389,9 @@ function renderAdminData(schedules) {
     }
   });
 
+  // 전체는 보고 의무와 관계없이 선택 날짜의 모든 일정 수
   updateSummary(
-    reportTargetCount,
+    schedules.filter(Boolean).length,
     completeCount,
     incompleteCount,
     satisfactionCount,
@@ -1392,31 +1404,15 @@ function renderAdminData(schedules) {
   const emptyMessage = document.getElementById("emptyMessage");
 
   if (emptyMessage) {
-    // ----------------------------------------------------------
-    // 아직 서버 조회 중이면
-    // "일정 없음"을 절대 표시하지 않음
-    // ----------------------------------------------------------
-
     if (adminSchedulesLoading) {
       emptyMessage.style.display = "none";
-    }
-
-    // ----------------------------------------------------------
-    // 서버 조회가 끝난 후 실제 일정이 있으면 숨김
-    // ----------------------------------------------------------
-    else if (schedules.length > 0) {
+    } else if (schedules.filter(Boolean).length > 0) {
       emptyMessage.style.display = "none";
-    }
-
-    // ----------------------------------------------------------
-    // 서버 조회가 끝났고 실제 일정도 없을 때만 표시
-    // ----------------------------------------------------------
-    else {
+    } else {
       emptyMessage.style.display = "block";
     }
   }
 }
-
 // ==========================================================
 // 운영진 대시보드 차시 수
 // ==========================================================
