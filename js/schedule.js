@@ -3359,7 +3359,7 @@ function renderAssistantEndReportForm(index, device) {
             id="${prefix}_classPhotosCount"
             class="assistant-file-count"
           >
-            ※ 수업사진은 최소 6장 이상 첨부해주세요.
+            ※ 수업사진은 최소 ${sessionCount === 1 ? 6 : 10}장 이상 첨부해주세요.
           </div>
 
           <div
@@ -3551,6 +3551,7 @@ async function submitAssistantEndReport(index, device) {
     const prefix = `assistantEnd_${device}_${index}`;
 
     const sessionCount = getSessionCount(schedule);
+    const minPhotoCount = sessionCount === 1 ? 6 : 10;
 
     console.log("[보조강사 종료보고 제출 차시 확인]", {
       pageId: schedule.pageId,
@@ -3675,9 +3676,10 @@ async function submitAssistantEndReport(index, device) {
     const selectedPhotoFiles =
       window.assistantClassPhotoFiles?.[photoKey] || [];
 
-    if (selectedPhotoFiles.length < 6) {
+    if (selectedPhotoFiles.length < minPhotoCount) {
       alert(
-        `수업사진은 최소 6장 이상 첨부해주세요.\n현재 ${selectedPhotoFiles.length}장입니다.`,
+        `수업사진은 최소 ${minPhotoCount}장 이상 첨부해주세요.\n` +
+          `현재 ${selectedPhotoFiles.length}장입니다.`,
       );
       return;
     }
@@ -4004,6 +4006,14 @@ async function submitAssistantEndReport(index, device) {
 
 async function previewAssistantClassPhotos(device, index) {
   const prefix = `assistantEnd_${device}_${index}`;
+  const schedule = currentReportSchedules[index];
+
+  if (!schedule) {
+    return;
+  }
+
+  const sessionCount = getSessionCount(schedule);
+  const minPhotoCount = sessionCount === 1 ? 6 : 10;
 
   const input = document.getElementById(`${prefix}_classPhotos`);
   const preview = document.getElementById(`${prefix}_classPhotosPreview`);
@@ -4164,10 +4174,12 @@ async function previewAssistantClassPhotos(device, index) {
       return;
     }
 
-    if (files.length >= 6) {
+    if (files.length >= minPhotoCount) {
       count.textContent = `※ 수업사진 ${files.length}장 첨부됨`;
     } else {
-      count.textContent = `※ 수업사진 ${files.length}장 첨부됨 (최소 6장 필요)`;
+      count.textContent =
+        `※ 수업사진 ${files.length}장 첨부됨 ` +
+        `(최소 ${minPhotoCount}장 필요)`;
     }
   }
 
@@ -4287,11 +4299,13 @@ async function previewAssistantClassPhotos(device, index) {
     // ======================================================
     if (files.length === 0) {
       preview.style.display = "none";
-      count.textContent = "※ 수업사진은 최소 6장 이상 첨부해주세요.";
-    } else if (files.length >= 6) {
+      count.textContent = `※ 수업사진은 최소 ${minPhotoCount}장 이상 첨부해주세요.`;
+    } else if (files.length >= minPhotoCount) {
       count.textContent = `※ 수업사진 ${files.length}장 첨부됨`;
     } else {
-      count.textContent = `※ 수업사진 ${files.length}장 첨부됨 (최소 6장 필요)`;
+      count.textContent =
+        `※ 수업사진 ${files.length}장 첨부됨 ` +
+        `(최소 ${minPhotoCount}장 필요)`;
     }
 
     // ======================================================
@@ -4310,7 +4324,7 @@ async function previewAssistantClassPhotos(device, index) {
     // 5. 제출 버튼 상태
     // ======================================================
     if (submitButton) {
-      submitButton.disabled = files.length < 6;
+      submitButton.disabled = files.length < minPhotoCount;
       submitButton.textContent = "종료보고 제출";
     }
   } catch (error) {
@@ -4320,11 +4334,11 @@ async function previewAssistantClassPhotos(device, index) {
 
     if (files.length > 0) {
       count.textContent =
-        files.length >= 6
+        files.length >= minPhotoCount
           ? `※ 수업사진 ${files.length}장 첨부됨`
-          : `※ 수업사진 ${files.length}장 첨부됨 (최소 6장 필요)`;
+          : `※ 수업사진 ${files.length}장 첨부됨 (최소 ${minPhotoCount}장 필요)`;
     } else {
-      count.textContent = "※ 수업사진은 최소 6장 이상 첨부해주세요.";
+      count.textContent = `※ 수업사진은 최소 ${minPhotoCount}장 이상 첨부해주세요.`;
     }
 
     renderPreviews();
@@ -4335,7 +4349,7 @@ async function previewAssistantClassPhotos(device, index) {
     );
 
     if (submitButton) {
-      submitButton.disabled = files.length < 6;
+      submitButton.disabled = files.length < minPhotoCount;
       submitButton.textContent = "종료보고 제출";
     }
   } finally {
