@@ -1416,7 +1416,7 @@ function generateCustomPDF(name) {
 
         dpi: 300,
 
-        windowHeight: Math.floor(clonedElement.scrollHeight * 0.8),
+        windowHeight: Math.ceil(clonedElement.scrollHeight),
 
         letterRendering: true,
 
@@ -1598,7 +1598,7 @@ function downloadPDF() {
 
       dpi: 300,
 
-      windowHeight: Math.floor(clonedElement.scrollHeight * 0.8),
+      windowHeight: Math.ceil(clonedElement.scrollHeight),
 
       letterRendering: true,
 
