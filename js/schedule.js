@@ -421,6 +421,7 @@ async function loadReportSchedules(data) {
     if (!hasCache) {
       reportScheduleLoading = true;
 
+      setScheduleLoadingMessage("일정 조회 중...");
       showLoading();
 
       // 이전 주 일정 화면 제거
@@ -2711,6 +2712,31 @@ function hideLoading() {
   if (loading) {
     loading.classList.add("hidden");
     loading.setAttribute("aria-hidden", "true");
+  }
+}
+
+// ========================================
+// 기존 일정 로딩창 문구 변경
+// ========================================
+
+function setScheduleLoadingMessage(message) {
+  const overlay = document.getElementById("scheduleLoadingOverlay");
+  const title = overlay?.querySelector(".schedule-loading-title");
+  const subtitle = document.getElementById("scheduleLoadingSubtitle");
+
+  if (title) {
+    title.textContent = message;
+  }
+
+  // 단계별 문구를 사용할 때 기존 자동 문구 변경 타이머 중지
+  if (typeof scheduleLoadingTimer !== "undefined" && scheduleLoadingTimer) {
+    clearInterval(scheduleLoadingTimer);
+    scheduleLoadingTimer = null;
+  }
+
+  if (subtitle) {
+    subtitle.textContent = "잠시만 기다려주세요.";
+    subtitle.style.opacity = "1";
   }
 }
 

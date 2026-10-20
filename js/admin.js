@@ -1186,10 +1186,6 @@ function changeDate(offset) {
 // 요약
 // ==========================================================
 
-// ==========================================================
-// 요약
-// ==========================================================
-
 function updateSummary(total, complete, incomplete, satisfaction) {
   const totalElement = document.getElementById("totalCount");
 
