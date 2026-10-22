@@ -3395,32 +3395,36 @@ function renderAssistantEndReportForm(index, device) {
         </div>
       </div>
 
+      
       <div class="main-teacher-end-report-field">
         <label for="${prefix}_consent">
-          4. 사진 및 영상촬영 활용 동의서
+          4. 사진 및 영상촬영 활용동의서
         </label>
 
         <div class="file-upload-area">
           <input
             type="file"
             id="${prefix}_consent"
-            accept="image/*,.heic,.heif,.pdf"
-            onchange="handleSinglePhotoSelect('${prefix}_consentPreview', '${prefix}_consentPreviewImage', this)"
+            accept="image/*,.heic,.heif"
+            multiple
+            onchange="previewAssistantConsentFiles('${device}', ${index})"
           />
 
           <div
-            id="${prefix}_consentPreview"
-            class="assistant-file-preview start-photo-preview"
-            style="display:none;"
+            id="${prefix}_consentCount"
+            class="assistant-file-count"
           >
-            <img
-              id="${prefix}_consentPreviewImage"
-              src=""
-              alt="사진 및 영상촬영 활용 동의서 미리보기"
-            />
+            ※ 촬영동의서는 1장 이상 첨부해주세요. 
           </div>
+
+          <div
+            id="${prefix}_consentPreview"
+            class="assistant-file-preview"
+            style="display:none;"
+          ></div>
         </div>
       </div>
+
 
       <div class="main-teacher-end-report-field">
         <label for="${prefix}_otherNote">5. 기타 특이사항</label>
@@ -3440,7 +3444,7 @@ function renderAssistantEndReportForm(index, device) {
         <textarea
           id="${prefix}_teacherReview"
           rows="4"
-          placeholder="수업 진행 소감이나 참여자 반응, 프로그램에 대한 의견을 자유롭게 작성해주세요."
+          placeholder="프로그램 참여 소감이나 기억에 남는 순간을 작성해 주세요."
         ></textarea>
       </div>
       `
@@ -3758,26 +3762,42 @@ async function submitAssistantEndReport(index, device) {
     }
 
     // ============================================================
-    // 촬영동의
+    // 촬영동의서 다중 파일 처리
     // ============================================================
 
     const consentInput = document.getElementById(`${prefix}_consent`);
 
-    let consentData = "";
-    let consentName = "";
-    let consentType = "";
-
+    const consentDataList = [];
+    if (consentInput?.__processingConsentFiles) {
+      alert("촬영동의서 처리가 완료될 때까지 기다려주세요.");
+      return;
+    }
     if (consentInput && consentInput.files && consentInput.files.length > 0) {
-      const originalFile = consentInput.files[0];
+      for (const originalFile of Array.from(consentInput.files)) {
+        // 촬영동의서는 사진 파일만 허용
+        if (!isImageFile(originalFile) && !isHeicCandidate(originalFile)) {
+          throw new Error(
+            `"${originalFile.name || "파일"}"은 이미지 파일이 아닙니다. JPG 등 사진 파일을 선택해주세요.`,
+          );
+        }
 
-      const file =
-        consentInput.__preparedFile || (await prepareUploadFile(originalFile));
+        // 기존 업로드 준비 함수로 HEIC 등 변환 처리
+        const file = await prepareUploadFile(originalFile);
 
-      consentData = await fileToBase64(file);
+        if (!isImageFile(file)) {
+          throw new Error(
+            `"${originalFile.name || "사진"}" 파일을 이미지로 처리하지 못했습니다.`,
+          );
+        }
 
-      consentName = file.name;
+        const base64 = await fileToBase64(file);
 
-      consentType = file.type;
+        consentDataList.push({
+          data: base64,
+          name: file.name,
+          type: file.type || "image/jpeg",
+        });
+      }
     }
 
     // ============================================================
@@ -3852,11 +3872,7 @@ async function submitAssistantEndReport(index, device) {
 
       attendanceBookType: attendanceBookType,
 
-      consentData: consentData,
-
-      consentName: consentName,
-
-      consentType: consentType,
+      consentDataList: consentDataList,
 
       otherNote: otherNote,
 
@@ -4233,19 +4249,17 @@ async function previewAssistantClassPhotos(device, index) {
   // 첨부 개수 표시
   // ------------------------------------------------------
   function updateCount(totalCount, pendingCount) {
+    setPhotoCountMessage(count, totalCount, "※ 수업사진 ");
+
     if (pendingCount > 0) {
-      count.textContent =
-        `※ 수업사진 ${totalCount}장 첨부됨 · ` +
-        `사진 ${pendingCount}장 변환 중...`;
+      count.append(
+        document.createTextNode(` · 사진 ${pendingCount}장 변환 중...`),
+      );
       return;
     }
 
-    if (files.length >= minPhotoCount) {
-      count.textContent = `※ 수업사진 ${files.length}장 첨부됨`;
-    } else {
-      count.textContent =
-        `※ 수업사진 ${files.length}장 첨부됨 ` +
-        `(최소 ${minPhotoCount}장 필요)`;
+    if (files.length < minPhotoCount) {
+      count.append(document.createTextNode(` (최소 ${minPhotoCount}장 필요)`));
     }
   }
 
@@ -4366,12 +4380,8 @@ async function previewAssistantClassPhotos(device, index) {
     if (files.length === 0) {
       preview.style.display = "none";
       count.textContent = `※ 수업사진은 최소 ${minPhotoCount}장 이상 첨부해주세요.`;
-    } else if (files.length >= minPhotoCount) {
-      count.textContent = `※ 수업사진 ${files.length}장 첨부됨`;
     } else {
-      count.textContent =
-        `※ 수업사진 ${files.length}장 첨부됨 ` +
-        `(최소 ${minPhotoCount}장 필요)`;
+      updateCount(files.length, 0);
     }
 
     // ======================================================
@@ -4399,10 +4409,7 @@ async function previewAssistantClassPhotos(device, index) {
     input.value = "";
 
     if (files.length > 0) {
-      count.textContent =
-        files.length >= minPhotoCount
-          ? `※ 수업사진 ${files.length}장 첨부됨`
-          : `※ 수업사진 ${files.length}장 첨부됨 (최소 ${minPhotoCount}장 필요)`;
+      updateCount(files.length, 0);
     } else {
       count.textContent = `※ 수업사진은 최소 ${minPhotoCount}장 이상 첨부해주세요.`;
     }
@@ -4423,6 +4430,157 @@ async function previewAssistantClassPhotos(device, index) {
     input.disabled = false;
   }
 }
+
+/**
+ * 보조강사 종료보고 촬영동의서 다중 파일 미리보기
+ */
+async function previewAssistantConsentFiles(device, index) {
+  const prefix = `assistantEnd_${device}_${index}`;
+
+  const input = document.getElementById(`${prefix}_consent`);
+  const preview = document.getElementById(`${prefix}_consentPreview`);
+  const count = document.getElementById(`${prefix}_consentCount`);
+
+  if (!input || !preview || !count) {
+    console.error("촬영동의서 미리보기 요소를 찾을 수 없습니다.", {
+      input: !!input,
+      preview: !!preview,
+      count: !!count,
+    });
+    return;
+  }
+
+  // 이전 미리보기 URL 해제
+  if (input.__consentPreviewUrls) {
+    input.__consentPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  }
+
+  input.__consentPreviewUrls = [];
+  preview.replaceChildren();
+  count.textContent = "";
+
+  const files = Array.from(input.files || []);
+
+  if (files.length === 0) {
+    preview.style.display = "none";
+    count.replaceChildren(
+      document.createTextNode("※ 촬영동의서는 1장 이상 첨부해주세요."),
+    );
+    count.style.display = "block";
+    input.__processingConsentFiles = false;
+    return;
+  }
+
+  if (input.__processingConsentFiles) {
+    return;
+  }
+
+  // 사진 이외 파일 차단
+  const invalidFile = files.find(
+    (file) => !isImageFile(file) && !isHeicCandidate(file),
+  );
+
+  if (invalidFile) {
+    alert(
+      `"${invalidFile.name || "파일"}"은 이미지 파일이 아닙니다. 사진 파일만 첨부해주세요.`,
+    );
+
+    input.value = "";
+    preview.style.display = "none";
+    count.style.display = "none";
+    input.__processingConsentFiles = false;
+    return;
+  }
+
+  input.__processingConsentFiles = true;
+  input.disabled = true;
+
+  preview.style.display = "grid";
+  count.style.display = "block";
+  count.textContent = `※ 촬영동의서 ${files.length}장 처리 중...`;
+
+  const createdUrls = [];
+
+  try {
+    const preparedFiles = [];
+
+    for (const originalFile of files) {
+      const file = await prepareUploadFile(originalFile);
+
+      if (!isImageFile(file) || isPdfFile(file)) {
+        throw new Error(
+          `"${originalFile.name || "사진"}" 파일을 이미지로 처리하지 못했습니다.`,
+        );
+      }
+
+      preparedFiles.push(file);
+    }
+
+    // 처리 중 파일 선택이 변경되었다면 이전 결과를 표시하지 않음
+    const currentFiles = Array.from(input.files || []);
+    const selectionChanged =
+      currentFiles.length !== files.length ||
+      currentFiles.some((file, i) => file !== files[i]);
+
+    if (selectionChanged) {
+      preview.style.display = "none";
+      count.textContent = "";
+      count.style.display = "none";
+      return;
+    }
+
+    preparedFiles.forEach((file, fileIndex) => {
+      const objectUrl = URL.createObjectURL(file);
+      createdUrls.push(objectUrl);
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "assistant-photo-preview-item";
+
+      const img = document.createElement("img");
+      img.src = objectUrl;
+      img.alt = `촬영동의서 ${fileIndex + 1}`;
+      img.loading = "lazy";
+
+      wrapper.appendChild(img);
+      preview.appendChild(wrapper);
+    });
+
+    input.__consentPreviewUrls = createdUrls;
+
+    setPhotoCountMessage(count, preparedFiles.length, "※ 촬영동의서 ");
+  } catch (error) {
+    createdUrls.forEach((url) => URL.revokeObjectURL(url));
+
+    input.__consentPreviewUrls = [];
+    preview.replaceChildren();
+    preview.style.display = "none";
+    count.textContent = "";
+    count.style.display = "none";
+
+    console.error("촬영동의서 미리보기 오류:", error);
+    alert("촬영동의서 미리보기를 처리하지 못했습니다.\n\n" + error.message);
+  } finally {
+    input.disabled = false;
+    input.__processingConsentFiles = false;
+  }
+}
+// ============================================================
+// 다중 첨부사진 장수 강조
+// ============================================================
+function setPhotoCountMessage(element, count, prefix = "※ ") {
+  element.replaceChildren();
+
+  element.append(document.createTextNode(prefix));
+
+  const number = document.createElement("strong");
+  number.textContent = `${count}장`;
+  number.style.color = "#406093";
+  number.style.fontWeight = "700";
+
+  element.append(number);
+  element.append(document.createTextNode(" 첨부됨"));
+}
+
 // ============================================================
 // 날짜 네비게이션
 // ============================================================
