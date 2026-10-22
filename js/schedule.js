@@ -3519,6 +3519,10 @@ function updateAssistantAttendanceTotal(device, index, session) {
 async function submitAssistantEndReport(index, device) {
   let lockKey = null;
 
+  // 서버 요청 및 응답 확인 상태
+  let serverRequestStarted = false;
+  let serverResultReceived = false;
+
   try {
     const schedule = currentReportSchedules[index];
 
@@ -3870,19 +3874,18 @@ async function submitAssistantEndReport(index, device) {
 
     console.log("========== 서버 요청 시작 ==========", {
       action: payload.action,
-
       instructorNo: payload.instructorNo || "",
-
       pageId: payload.pageId || "",
     });
 
+    // 실제 서버 요청 시작
+    serverRequestStarted = true;
+
     const response = await fetch(API_URL, {
       method: "POST",
-
       headers: {
         "Content-Type": "application/json",
       },
-
       body: JSON.stringify(payload),
     });
 
@@ -3890,7 +3893,6 @@ async function submitAssistantEndReport(index, device) {
 
     console.log("========== 서버 응답 도착 ==========", {
       elapsedMs: serverTime,
-
       httpStatus: response.status,
     });
 
@@ -3902,18 +3904,67 @@ async function submitAssistantEndReport(index, device) {
 
     const result = await response.json();
 
+    // 서버에서 해석 가능한 JSON 응답을 받은 상태
+    serverResultReceived = true;
+
     console.log("========== 보조강사 종료보고 서버 결과 ==========", {
       success: result.success,
-
       message: result.message,
-
       timing: result.timing || null,
     });
 
     if (result.timing) {
       console.table(result.timing);
     }
+    // ============================================================
+    // 서버 처리 중: 동일 일정 중복 요청 차단
+    // ============================================================
 
+    if (result.submissionInProgress) {
+      hideReportSubmitLoading();
+
+      alert(
+        result.message ||
+          "같은 일정의 종료보고가 서버에서 처리 중입니다.\n" +
+            "잠시 기다린 후 제출 상태를 다시 확인해주세요.",
+      );
+
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = "종료보고 제출";
+      }
+
+      return;
+    }
+
+    // ============================================================
+    // 이미 저장됐으나 Notion 상태 갱신이 실패한 경우
+    // ============================================================
+
+    const savedButNotionFailed =
+      !result.success &&
+      (result.alreadySubmitted === true ||
+        String(result.message || "").includes(
+          "시트와 사진 저장까지 완료되었으나 Notion 업데이트에 실패",
+        ));
+
+    if (savedButNotionFailed) {
+      hideReportSubmitLoading();
+
+      alert(
+        (result.message || "종료보고 데이터는 이미 저장된 상태입니다.") +
+          "\n\n" +
+          "같은 일정의 종료보고를 다시 제출하면 중복 저장을 차단하고 " +
+          "Notion 상태 갱신을 재시도합니다. 현재 화면을 유지해주세요.",
+      );
+
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = "Notion 상태 갱신 재시도";
+      }
+
+      return;
+    }
     // ============================================================
     // 서버 작업 실패
     // ============================================================
@@ -3979,21 +4030,36 @@ async function submitAssistantEndReport(index, device) {
       normalizeRole(instructorData.role),
     );
   } catch (error) {
-    // 오류 발생 시 로딩 종료
     hideReportSubmitLoading();
 
     console.error("보조강사 종료보고 제출 오류:", error);
 
-    alert("종료보고 제출 중 오류가 발생했습니다.\n\n" + error.message);
+    const requestOutcomeUnknown = serverRequestStarted && !serverResultReceived;
 
     const prefix = `assistantEnd_${device}_${index}`;
 
     const submitButton = document.getElementById(`${prefix}_submit`);
 
+    if (requestOutcomeUnknown) {
+      alert(
+        "서버 응답을 확인하지 못했습니다.\n" +
+          "오류가 발생했더라도 종료보고 저장이 진행됐을 수 있습니다.\n\n" +
+          "현재 화면을 유지하고 잠시 후 다시 시도해주세요. " +
+          "같은 일정이 이미 저장됐다면 서버에서 중복 저장을 차단하고 " +
+          "Notion 상태 갱신을 재시도합니다.\n\n" +
+          "오류 내용: " +
+          error.message,
+      );
+    } else {
+      alert("종료보고 제출 중 오류가 발생했습니다.\n\n" + error.message);
+    }
+
     if (submitButton) {
       submitButton.disabled = false;
 
-      submitButton.textContent = "종료보고 제출";
+      submitButton.textContent = requestOutcomeUnknown
+        ? "제출 결과 확인/재시도"
+        : "종료보고 제출";
     }
   } finally {
     releaseReportSubmitLock(lockKey);
