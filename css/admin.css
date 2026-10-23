@@ -261,6 +261,7 @@
   font-weight: 700;
   color: #406093;
   text-align: left;
+  align-items: center;
 }
 
 .dispatch-date {
@@ -565,6 +566,7 @@
   .dispatch-title {
     font-size: 18px;
     color: #406093;
+    align-items: center;
   }
 
   .teacher-list {
@@ -1008,7 +1010,7 @@
    ============================================================ */
 
 .one-day-card .dispatch-title {
-  align-items: flex-start;
+  align-items: center;
 }
 
 .one-day-card .facility-name {
