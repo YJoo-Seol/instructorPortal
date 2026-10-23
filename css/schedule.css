@@ -833,12 +833,16 @@ input[type="file"]::file-selector-button:hover {
     opacity: 0.35;
   }
 }
-/* 기본: PC 문구 표시 */
+/* 기본: PC·태블릿 문구 */
+.satisfaction-text-pc {
+  display: inline;
+}
+
 .satisfaction-text-mobile {
   display: none;
 }
 
-/* 모바일: 축약 문구 표시 */
+/* 모바일: 두 줄 축약 문구 */
 @media (max-width: 768px) {
   .satisfaction-text-pc {
     display: none;
@@ -846,8 +850,34 @@ input[type="file"]::file-selector-button:hover {
 
   .satisfaction-text-mobile {
     display: inline;
+    white-space: normal;
+    text-align: center;
   }
 }
+
+/* PC·태블릿: 시설 정보 수직 중앙 정렬 */
+.desktop-facility-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.desktop-facility-info .satisfaction-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 65%;
+}
+
+.desktop-facility-info .desktop-facility-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 /* ============================================================
    12. 반응형 미디어 쿼리
    ============================================================ */
