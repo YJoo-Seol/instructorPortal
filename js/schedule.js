@@ -4041,36 +4041,189 @@ async function submitAssistantEndReport(index, device) {
       normalizeRole(instructorData.role),
     );
   } catch (error) {
-    hideReportSubmitLoading();
-
     console.error("보조강사 종료보고 제출 오류:", error);
 
     const requestOutcomeUnknown = serverRequestStarted && !serverResultReceived;
 
     const prefix = `assistantEnd_${device}_${index}`;
-
     const submitButton = document.getElementById(`${prefix}_submit`);
 
     if (requestOutcomeUnknown) {
-      alert(
-        "서버 응답을 확인하지 못했습니다.\n" +
-          "오류가 발생했더라도 종료보고 저장이 진행됐을 수 있습니다.\n\n" +
-          "현재 화면을 유지하고 잠시 후 다시 시도해주세요. " +
-          "같은 일정이 이미 저장됐다면 서버에서 중복 저장을 차단하고 " +
-          "Notion 상태 갱신을 재시도합니다.\n\n" +
-          "오류 내용: " +
-          error.message,
-      );
+      // 기존 로딩을 종료하고, 제출 상태 확인용 로딩으로 전환
+      showReportSubmitLoading("제출 결과를 확인하고 있습니다.");
+
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "제출 결과 확인 중...";
+      }
+
+      try {
+        const storedData = sessionStorage.getItem("instructorData");
+
+        if (!storedData) {
+          throw new Error("강사 정보를 찾을 수 없습니다.");
+        }
+
+        const instructorData = JSON.parse(storedData);
+
+        const checkResponse = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "getInstructorReportSchedules",
+            instructorNo:
+              instructorData.instructorNo || schedule.instructorNo || "",
+            date: schedule.date || "",
+          }),
+        });
+
+        if (!checkResponse.ok) {
+          throw new Error("제출 상태 조회 요청에 실패했습니다.");
+        }
+
+        const checkResult = await checkResponse.json();
+
+        if (!checkResult.success || !Array.isArray(checkResult.schedules)) {
+          throw new Error("제출 상태 조회 결과를 확인할 수 없습니다.");
+        }
+
+        // 같은 일정의 제출 상태를 최대 3회 확인한다.
+        // Notion 반영 지연을 고려해 1초 간격으로 재조회한다.
+        const submittedPageId = String(schedule.pageId || "").trim();
+
+        if (!submittedPageId) {
+          throw new Error("제출 대상 일정의 pageId가 없습니다.");
+        }
+
+        let confirmedSchedule = null;
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+
+          const checkResponse = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              action: "getInstructorReportSchedules",
+              instructorNo:
+                instructorData.instructorNo || schedule.instructorNo || "",
+              date: schedule.date || "",
+            }),
+          });
+
+          if (!checkResponse.ok) {
+            throw new Error("제출 상태 조회 요청에 실패했습니다.");
+          }
+
+          const checkResult = await checkResponse.json();
+
+          if (!checkResult.success || !Array.isArray(checkResult.schedules)) {
+            throw new Error("제출 상태 조회 결과가 올바르지 않습니다.");
+          }
+
+          confirmedSchedule = checkResult.schedules.find(
+            (item) => String(item.pageId || "").trim() === submittedPageId,
+          );
+
+          if (confirmedSchedule?.myReport?.end === true) {
+            break;
+          }
+        }
+
+        // 서버 조회 결과에서 제출 완료가 확인된 경우
+        if (confirmedSchedule?.myReport?.end === true) {
+          const targetSchedule = currentReportSchedules.find(
+            (item) => String(item.pageId || "").trim() === submittedPageId,
+          );
+
+          if (targetSchedule) {
+            targetSchedule.myReport = targetSchedule.myReport || {};
+            targetSchedule.myReport.end = true;
+          }
+
+          hideReportSubmitLoading();
+
+          window.currentAssistantEndReportSchedule = null;
+
+          alert("서버 응답은 끊겼지만 종료보고 저장이 확인되었습니다.");
+
+          const mobileArea = document.getElementById("assistantEndReportArea");
+
+          if (mobileArea) {
+            mobileArea.remove();
+          }
+
+          const desktopArea = document.getElementById(
+            "desktopAssistantEndReportArea",
+          );
+
+          if (desktopArea) {
+            desktopArea.remove();
+          }
+
+          renderScheduleList(
+            currentReportSchedules,
+            normalizeRole(instructorData.role),
+          );
+
+          return;
+        }
+
+        // 미제출 또는 조회 결과만으로 완료를 확정할 수 없는 경우
+        hideReportSubmitLoading();
+
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = "제출 결과 재확인";
+        }
+
+        alert(
+          "현재 조회에서는 종료보고 완료가 확인되지 않았습니다.\n" +
+            "저장되지 않았다고 확정할 수는 없습니다.\n" +
+            "입력 내용을 유지했으니 잠시 후 제출 결과를 다시 확인해주세요.",
+        );
+
+        hideReportSubmitLoading();
+
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = "제출 결과 재확인";
+        }
+
+        alert(
+          "서버 응답을 받지 못해 제출 여부를 확정할 수 없습니다.\n" +
+            "입력 내용은 유지했습니다. 제출 상태를 다시 확인해주세요.",
+        );
+      } catch (checkError) {
+        console.error("종료보고 제출 상태 확인 오류:", checkError);
+
+        hideReportSubmitLoading();
+
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = "제출 결과 재확인";
+        }
+
+        alert(
+          "제출 결과를 확인하지 못했습니다.\n" +
+            "입력 내용은 유지했습니다. 잠시 후 다시 확인해주세요.",
+        );
+      }
     } else {
+      hideReportSubmitLoading();
+
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = "종료보고 제출";
+      }
+
       alert("종료보고 제출 중 오류가 발생했습니다.\n\n" + error.message);
-    }
-
-    if (submitButton) {
-      submitButton.disabled = false;
-
-      submitButton.textContent = requestOutcomeUnknown
-        ? "제출 결과 확인/재시도"
-        : "종료보고 제출";
     }
   } finally {
     releaseReportSubmitLock(lockKey);
