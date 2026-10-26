@@ -4042,32 +4042,86 @@ async function submitAssistantEndReport(index, device) {
     );
   } catch (error) {
     hideReportSubmitLoading();
-
     console.error("보조강사 종료보고 제출 오류:", error);
 
     const requestOutcomeUnknown = serverRequestStarted && !serverResultReceived;
-
     const prefix = `assistantEnd_${device}_${index}`;
-
     const submitButton = document.getElementById(`${prefix}_submit`);
+    let statusConfirmed = false;
 
+    // 요청은 서버로 전송됐지만 응답을 못 받은 경우에만 저장 상태를 조회한다.
     if (requestOutcomeUnknown) {
-      alert(
-        "서버 응답을 확인하지 못했습니다.\n" +
-          "오류가 발생했더라도 종료보고 저장이 진행됐을 수 있습니다.\n\n" +
-          "현재 화면을 유지하고 잠시 후 다시 시도해주세요. " +
-          "같은 일정이 이미 저장됐다면 서버에서 중복 저장을 차단하고 " +
-          "Notion 상태 갱신을 재시도합니다.\n\n" +
-          "오류 내용: " +
-          error.message,
-      );
+      try {
+        const storedData = sessionStorage.getItem("instructorData");
+        const instructorDataForCheck = storedData ? JSON.parse(storedData) : null;
+        const instructorNo = String(
+          (instructorDataForCheck && instructorDataForCheck.instructorNo) ||
+            schedule.instructorNo ||
+            "",
+        ).trim();
+        const pageId = String(schedule.pageId || "").trim();
+        const date = String(schedule.date || "").trim();
+
+        if (instructorNo && pageId && date) {
+          const statusResponse = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "getInstructorReportSchedules",
+              instructorNo,
+              date,
+            }),
+          });
+
+          if (statusResponse.ok) {
+            const statusResult = await statusResponse.json();
+            if (statusResult && statusResult.success === true && Array.isArray(statusResult.schedules)) {
+              const savedSchedule = statusResult.schedules.find(
+                (item) => String(item.pageId || "").trim() === pageId,
+              );
+
+              if (savedSchedule && savedSchedule.myReport && savedSchedule.myReport.end === true) {
+                statusConfirmed = true;
+                const targetSchedule = currentReportSchedules.find(
+                  (item) => String(item.pageId || "").trim() === pageId,
+                );
+                if (targetSchedule) {
+                  targetSchedule.myReport = targetSchedule.myReport || {};
+                  targetSchedule.myReport.end = true;
+                }
+
+                window.currentAssistantEndReportSchedule = null;
+                const mobileArea = document.getElementById("assistantEndReportArea");
+                if (mobileArea) mobileArea.remove();
+                const desktopArea = document.getElementById("desktopAssistantEndReportArea");
+                if (desktopArea) desktopArea.remove();
+
+                alert("서버 저장 상태를 다시 확인했습니다. 종료보고는 이미 제출되어 있습니다.");
+                renderScheduleList(
+                  currentReportSchedules,
+                  normalizeRole(instructorDataForCheck && instructorDataForCheck.role),
+                );
+              }
+            }
+          }
+        }
+      } catch (statusCheckError) {
+        console.error("종료보고 저장 상태 재확인 실패:", statusCheckError);
+      }
+
+      if (!statusConfirmed) {
+        alert(
+          "서버 응답을 받지 못했고, 저장 완료 상태도 확인되지 않았습니다.\\n" +
+            "입력한 내용은 화면에 유지했습니다. 중복 제출을 피하기 위해 잠시 후 상태를 다시 확인한 뒤 재시도해주세요.\\n\\n" +
+            "오류 내용: " + error.message,
+        );
+      }
     } else {
-      alert("종료보고 제출 중 오류가 발생했습니다.\n\n" + error.message);
+      alert("종료보고 제출 중 오류가 발생했습니다.\\n\\n" + error.message);
     }
 
-    if (submitButton) {
+    if (!statusConfirmed && submitButton) {
       submitButton.disabled = false;
-
       submitButton.textContent = requestOutcomeUnknown
         ? "제출 결과 확인/재시도"
         : "종료보고 제출";
