@@ -458,7 +458,10 @@ async function loadConfirmation(name, phone) {
      */
     currentMonth = data.month || currentMonth;
 
-    renderConfirmation(data);
+    renderConfirmation({
+      ...data,
+      phone: phone || data.phone || "",
+    });
 
     const confirmationArea = document.getElementById("confirmationArea");
 
