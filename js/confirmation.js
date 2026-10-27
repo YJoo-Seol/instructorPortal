@@ -845,8 +845,8 @@ function renderConfirmation(res) {
           src="./img/bnk-logo-horizontal.png"
           alt="회사 로고"
           style="
-            width: 60%;
-            max-width: 360px;
+            width: 45%;
+            max-width: 260px;
             height: auto;
             display: inline-block;
           "
