@@ -133,9 +133,29 @@ table.data-table {
 }
 
 .signature-area,
-.pdf-avoid-break {
+.pdf-avoid-break,
+.pdf-signature-footer {
   page-break-inside: avoid !important;
   break-inside: avoid !important;
+}
+
+.pdf-signature-footer {
+  display: block;
+  width: 100%;
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+}
+
+.pdf-signature-footer .signature-area {
+  margin-top: 16px;
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+}
+
+.pdf-signature-footer img {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
 }
 
 #confirmation-card table.data-table {
@@ -205,19 +225,27 @@ table.data-table th {
 }
 
 /* ============================================================
-   PDF 페이지 끊김 방지
+   PDF 페이지 나눔 처리
    ============================================================ */
 
-#confirmation-card tr,
-.signature-area,
-.pdf-avoid-break {
+#confirmation-card {
+  box-sizing: border-box !important;
+  padding-bottom: 12px !important;
+}
+
+#confirmation-card table.data-table {
+  page-break-inside: auto !important;
+  break-inside: auto !important;
+}
+
+#confirmation-card table.data-table tr {
   page-break-inside: avoid !important;
   break-inside: avoid !important;
 }
 
 .section-title {
   page-break-after: avoid !important;
-  break-after: avoid !important;
+  break-after: avoid-page !important;
   background-color: #406093;
   color: white;
   padding: 8px 12px;
@@ -471,4 +499,23 @@ table.data-table th {
   .phone-verification-sub {
     font-size: 13px;
   }
+}
+
+/* PDF 출력 시 컨테이너 및 섹션 제목 잘림 방지 */
+#confirmation-card {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+}
+
+#confirmation-card .section-title {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
+#confirmation-card table.data-table {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }

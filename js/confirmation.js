@@ -806,7 +806,7 @@ function renderConfirmation(res) {
 
   html += `
       </table>
-
+<div class="pdf-signature-footer">
       <div class="signature-area pdf-avoid-break">
 
         <div class="signature-title">
@@ -852,7 +852,7 @@ function renderConfirmation(res) {
           "
         >
       </div>
-
+</div>
     </div>
   `;
 
@@ -1347,25 +1347,24 @@ function generateCustomPDF(name) {
          복사본 스타일
          ------------------------------------------------------ */
 
-    clonedElement.style.width = "790px";
-
+    clonedElement.style.width = "670px";
+    clonedElement.style.maxWidth = "670px";
+    clonedElement.style.boxSizing = "border-box";
+    clonedElement.style.transform = "none";
+    clonedElement.style.transformOrigin = "top LEFT";
     clonedElement.style.height = "auto";
-
     clonedElement.style.maxHeight = "none";
-
     clonedElement.style.overflow = "visible";
-
     clonedElement.style.position = "relative";
-
     clonedElement.style.display = "block";
-
     clonedElement.style.background = "#ffffff";
+    clonedElement.style.boxSizing = "border-box";
 
     /* 기존 80% 축소 유지 */
 
-    clonedElement.style.transform = "scale(0.8)";
+    // clonedElement.style.transform = "scale(0.8)";
 
-    clonedElement.style.transformOrigin = "top center";
+    // clonedElement.style.transformOrigin = "top center";
 
     /* ------------------------------------------------------
          내부 테이블 스타일
@@ -1400,29 +1399,23 @@ function generateCustomPDF(name) {
          ------------------------------------------------------ */
 
     const opt = {
-      margin: [10, 0, 0, 0],
+      margin: [15, 15, 12, 15],
 
       filename: "temp.pdf",
 
       pagebreak: {
         mode: ["css", "legacy"],
+        avoid: [".pdf-signature-footer"],
       },
 
       html2canvas: {
         scale: 2,
-
         scrollY: 0,
-
         scrollX: 0,
-
         useCORS: true,
-
         dpi: 300,
-
         windowHeight: Math.ceil(clonedElement.scrollHeight),
-
         letterRendering: true,
-
         allowTaint: false,
       },
 
@@ -1530,24 +1523,22 @@ function downloadPDF() {
   /* ----------------------------------------------------------
      스타일 적용
      ---------------------------------------------------------- */
-
-  clonedElement.style.width = "790px";
-
+  clonedElement.style.width = "670px";
+  clonedElement.style.maxWidth = "670px";
+  clonedElement.style.boxSizing = "border-box";
+  clonedElement.style.transform = "none";
+  clonedElement.style.transformOrigin = "top LEFT";
   clonedElement.style.height = "auto";
-
   clonedElement.style.maxHeight = "none";
-
   clonedElement.style.overflow = "visible";
-
   clonedElement.style.position = "relative";
-
   clonedElement.style.display = "block";
-
   clonedElement.style.background = "#ffffff";
+  clonedElement.style.boxSizing = "border-box";
 
-  clonedElement.style.transform = "scale(0.8)";
+  // clonedElement.style.transform = "scale(0.8)";
 
-  clonedElement.style.transformOrigin = "top center";
+  // clonedElement.style.transformOrigin = "top center";
 
   /* ----------------------------------------------------------
      테이블 스타일
@@ -1582,29 +1573,23 @@ function downloadPDF() {
      ---------------------------------------------------------- */
 
   const opt = {
-    margin: [10, 0, 0, 0],
+    margin: [15, 15, 12, 15],
 
     filename: filename,
 
     pagebreak: {
       mode: ["css", "legacy"],
+      avoid: [".pdf-signature-footer"],
     },
 
     html2canvas: {
       scale: 2,
-
       scrollY: 0,
-
       scrollX: 0,
-
       useCORS: true,
-
       dpi: 300,
-
       windowHeight: Math.ceil(clonedElement.scrollHeight),
-
       letterRendering: true,
-
       allowTaint: false,
     },
 
