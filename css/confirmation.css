@@ -177,7 +177,7 @@ table.data-table {
   display: table-cell !important;
   height: auto !important;
   min-height: 0 !important;
-  padding: 8px 4px !important;
+  padding: 4px 4px !important;
   border: 1px dotted #d5dbe3 !important;
   text-align: center !important;
   vertical-align: middle !important;
