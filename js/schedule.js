@@ -2980,7 +2980,7 @@ async function fileToBase64(file) {
   });
 }
 
-async function compressImageFile(file) {
+async function compressImageFile(file, options = {}) {
   const preparedFile = await prepareUploadFile(file);
 
   if (!isImageFile(preparedFile)) {
@@ -2996,9 +2996,19 @@ async function compressImageFile(file) {
   // 이미지 압축 설정
   // ========================================
 
-  const maxWidth = 4000;
-  const maxHeight = 4000;
-  const jpegQuality = 0.92;
+  const maxWidth =
+    Number.isFinite(options.maxWidth) && options.maxWidth > 0
+      ? Math.max(1, Math.floor(options.maxWidth))
+      : 4000;
+
+  const maxHeight =
+    Number.isFinite(options.maxHeight) && options.maxHeight > 0
+      ? Math.max(1, Math.floor(options.maxHeight))
+      : 4000;
+
+  const jpegQuality = Number.isFinite(options.jpegQuality)
+    ? Math.min(1, Math.max(0, options.jpegQuality))
+    : 0.92;
 
   return new Promise(function (resolve, reject) {
     const reader = new FileReader();
@@ -3517,13 +3527,14 @@ function updateAssistantAttendanceTotal(device, index, session) {
 // ============================================================
 async function submitAssistantEndReport(index, device) {
   let lockKey = null;
+  let schedule = null;
 
   // 서버 요청 및 응답 확인 상태
   let serverRequestStarted = false;
   let serverResultReceived = false;
 
   try {
-    const schedule = currentReportSchedules[index];
+    schedule = currentReportSchedules[index];
 
     if (!schedule) {
       alert("선택한 출강 일정 정보를 찾을 수 없습니다.");
@@ -3749,11 +3760,22 @@ async function submitAssistantEndReport(index, device) {
         attendanceBookInput.__preparedFile ||
         (await prepareUploadFile(originalFile));
 
-      attendanceBookData = await fileToBase64(file);
+      // 이미지 출강부만 1920px로 압축
+      if (isImageFile(file) && !isPdfFile(file)) {
+        const compressedAttendanceBook = await compressImageFile(file, {
+          maxWidth: 1920,
+          maxHeight: 1920,
+        });
 
-      attendanceBookName = file.name;
-
-      attendanceBookType = file.type;
+        attendanceBookData = compressedAttendanceBook.base64;
+        attendanceBookName = compressedAttendanceBook.fileName;
+        attendanceBookType = compressedAttendanceBook.fileType;
+      } else {
+        // PDF 등 기존 비이미지 파일은 기존 처리 방식 유지
+        attendanceBookData = await fileToBase64(file);
+        attendanceBookName = file.name;
+        attendanceBookType = file.type;
+      }
     }
 
     // ============================================================
@@ -3785,12 +3807,15 @@ async function submitAssistantEndReport(index, device) {
           );
         }
 
-        const base64 = await fileToBase64(file);
+        const compressedConsent = await compressImageFile(file, {
+          maxWidth: 1920,
+          maxHeight: 1920,
+        });
 
         consentDataList.push({
-          data: base64,
-          name: file.name,
-          type: file.type || "image/jpeg",
+          data: compressedConsent.base64,
+          name: compressedConsent.fileName,
+          type: compressedConsent.fileType,
         });
       }
     }
@@ -4049,7 +4074,6 @@ async function submitAssistantEndReport(index, device) {
     const submitButton = document.getElementById(`${prefix}_submit`);
 
     if (requestOutcomeUnknown) {
-      // 기존 로딩을 종료하고, 제출 상태 확인용 로딩으로 전환
       showReportSubmitLoading("제출 결과를 확인하고 있습니다.");
 
       if (submitButton) {
@@ -4064,33 +4088,12 @@ async function submitAssistantEndReport(index, device) {
           throw new Error("강사 정보를 찾을 수 없습니다.");
         }
 
-        const instructorData = JSON.parse(storedData);
+        const recoveryInstructorData = JSON.parse(storedData);
 
-        const checkResponse = await fetch(API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "getInstructorReportSchedules",
-            instructorNo:
-              instructorData.instructorNo || schedule.instructorNo || "",
-            date: schedule.date || "",
-          }),
-        });
-
-        if (!checkResponse.ok) {
-          throw new Error("제출 상태 조회 요청에 실패했습니다.");
+        if (!schedule) {
+          throw new Error("제출 대상 일정 정보를 찾을 수 없습니다.");
         }
 
-        const checkResult = await checkResponse.json();
-
-        if (!checkResult.success || !Array.isArray(checkResult.schedules)) {
-          throw new Error("제출 상태 조회 결과를 확인할 수 없습니다.");
-        }
-
-        // 같은 일정의 제출 상태를 최대 3회 확인한다.
-        // Notion 반영 지연을 고려해 1초 간격으로 재조회한다.
         const submittedPageId = String(schedule.pageId || "").trim();
 
         if (!submittedPageId) {
@@ -4098,45 +4101,64 @@ async function submitAssistantEndReport(index, device) {
         }
 
         let confirmedSchedule = null;
+        let lastStatusCheckError = null;
 
-        for (let attempt = 0; attempt < 3; attempt++) {
-          if (attempt > 0) {
+        // 제출 상태를 최대 3회 확인한다.
+        // 한 번의 조회가 실패해도 나머지 재시도를 진행한다.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          if (attempt > 1) {
             await new Promise((resolve) => setTimeout(resolve, 1000));
           }
 
-          const checkResponse = await fetch(API_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              action: "getInstructorReportSchedules",
-              instructorNo:
-                instructorData.instructorNo || schedule.instructorNo || "",
-              date: schedule.date || "",
-            }),
-          });
+          try {
+            const checkResponse = await fetch(API_URL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                action: "getInstructorReportSchedules",
+                instructorNo:
+                  recoveryInstructorData.instructorNo ||
+                  schedule.instructorNo ||
+                  "",
+                date: schedule.date || "",
+              }),
+            });
 
-          if (!checkResponse.ok) {
-            throw new Error("제출 상태 조회 요청에 실패했습니다.");
-          }
+            if (!checkResponse.ok) {
+              throw new Error(
+                `제출 상태 조회 요청 실패 (HTTP ${checkResponse.status})`,
+              );
+            }
 
-          const checkResult = await checkResponse.json();
+            const checkResult = await checkResponse.json();
 
-          if (!checkResult.success || !Array.isArray(checkResult.schedules)) {
-            throw new Error("제출 상태 조회 결과가 올바르지 않습니다.");
-          }
+            if (!checkResult.success || !Array.isArray(checkResult.schedules)) {
+              throw new Error("제출 상태 조회 결과가 올바르지 않습니다.");
+            }
 
-          confirmedSchedule = checkResult.schedules.find(
-            (item) => String(item.pageId || "").trim() === submittedPageId,
-          );
+            confirmedSchedule =
+              checkResult.schedules.find(
+                (item) => String(item.pageId || "").trim() === submittedPageId,
+              ) || null;
 
-          if (confirmedSchedule?.myReport?.end === true) {
-            break;
+            lastStatusCheckError = null;
+
+            if (confirmedSchedule?.myReport?.end === true) {
+              break;
+            }
+          } catch (attemptError) {
+            lastStatusCheckError = attemptError;
+
+            console.warn("[종료보고 제출 상태 확인 재시도]", {
+              attempt,
+              error: attemptError.message,
+            });
           }
         }
 
-        // 서버 조회 결과에서 제출 완료가 확인된 경우
+        // 종료보고 완료 상태가 확인된 경우
         if (confirmedSchedule?.myReport?.end === true) {
           const targetSchedule = currentReportSchedules.find(
             (item) => String(item.pageId || "").trim() === submittedPageId,
@@ -4151,7 +4173,9 @@ async function submitAssistantEndReport(index, device) {
 
           window.currentAssistantEndReportSchedule = null;
 
-          alert("서버 응답은 끊겼지만 종료보고 저장이 확인되었습니다.");
+          alert(
+            "서버 응답은 끊겼지만 일정 조회에서 종료보고 완료 상태가 확인되었습니다.",
+          );
 
           const mobileArea = document.getElementById("assistantEndReportArea");
 
@@ -4169,36 +4193,32 @@ async function submitAssistantEndReport(index, device) {
 
           renderScheduleList(
             currentReportSchedules,
-            normalizeRole(instructorData.role),
+            normalizeRole(recoveryInstructorData.role),
           );
 
           return;
         }
 
-        // 미제출 또는 조회 결과만으로 완료를 확정할 수 없는 경우
-        hideReportSubmitLoading();
-
-        if (submitButton) {
-          submitButton.disabled = false;
-          submitButton.textContent = "제출 결과 재확인";
+        // 최대 재시도 이후에도 완료 상태를 확인하지 못한 경우
+        if (lastStatusCheckError) {
+          console.error(
+            "종료보고 제출 상태 최종 확인 실패:",
+            lastStatusCheckError,
+          );
         }
-
-        alert(
-          "현재 조회에서는 종료보고 완료가 확인되지 않았습니다.\n" +
-            "저장되지 않았다고 확정할 수는 없습니다.\n" +
-            "입력 내용을 유지했으니 잠시 후 제출 결과를 다시 확인해주세요.",
-        );
 
         hideReportSubmitLoading();
 
         if (submitButton) {
           submitButton.disabled = false;
-          submitButton.textContent = "제출 결과 재확인";
+          submitButton.textContent = "종료보고 재제출";
         }
 
         alert(
-          "서버 응답을 받지 못해 제출 여부를 확정할 수 없습니다.\n" +
-            "입력 내용은 유지했습니다. 제출 상태를 다시 확인해주세요.",
+          "종료보고 완료가 확인되지 않았습니다.\n" +
+            "작성한 내용은 그대로 유지되어 있습니다.\n" +
+            "일정 목록에서 완료 여부를 확인해주세요. " +
+            "완료 표시가 없다면 아래 버튼을 눌러 다시 제출해주세요.",
         );
       } catch (checkError) {
         console.error("종료보고 제출 상태 확인 오류:", checkError);
@@ -4207,12 +4227,14 @@ async function submitAssistantEndReport(index, device) {
 
         if (submitButton) {
           submitButton.disabled = false;
-          submitButton.textContent = "제출 결과 재확인";
+          submitButton.textContent = "종료보고 다시 제출";
         }
 
         alert(
-          "제출 결과를 확인하지 못했습니다.\n" +
-            "입력 내용은 유지했습니다. 잠시 후 다시 확인해주세요.",
+          "종료보고 제출 결과를 확인하지 못했습니다.\n" +
+            "작성한 내용은 그대로 유지되어 있습니다.\n" +
+            "잠시 후 일정 목록에서 완료 여부를 확인해주세요. " +
+            "완료 표시가 없다면 아래 버튼을 눌러 다시 제출해주세요.",
         );
       }
     } else {
