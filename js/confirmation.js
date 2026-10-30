@@ -1399,7 +1399,7 @@ function generateCustomPDF(name) {
          ------------------------------------------------------ */
 
     const opt = {
-      margin: [15, 15, 12, 15],
+      margin: [5, 15, 5, 15],
 
       filename: "temp.pdf",
 
@@ -1576,7 +1576,7 @@ function downloadPDF() {
      ---------------------------------------------------------- */
 
   const opt = {
-    margin: [15, 15, 12, 15],
+    margin: [5, 15, 5, 15],
 
     filename: filename,
 
