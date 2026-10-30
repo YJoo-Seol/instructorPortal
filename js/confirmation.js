@@ -1414,7 +1414,10 @@ function generateCustomPDF(name) {
         scrollX: 0,
         useCORS: true,
         dpi: 300,
-        windowHeight: Math.ceil(clonedElement.scrollHeight),
+        windowHeight: Math.max(
+          window.innerHeight,
+          Math.ceil(originalElement.scrollHeight) + 200,
+        ),
         letterRendering: true,
         allowTaint: false,
       },
@@ -1588,7 +1591,10 @@ function downloadPDF() {
       scrollX: 0,
       useCORS: true,
       dpi: 300,
-      windowHeight: Math.ceil(clonedElement.scrollHeight),
+      windowHeight: Math.max(
+        window.innerHeight,
+        Math.ceil(originalElement.scrollHeight) + 200,
+      ),
       letterRendering: true,
       allowTaint: false,
     },
